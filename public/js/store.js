@@ -17,7 +17,33 @@
 
   function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  // On GitHub Pages there is no server: the build sets these two meta tags, products come from
+  // data/*.json and the order is handed to the owner on WhatsApp instead of the admin panel.
+  const BASE = (document.querySelector('meta[name="th-base"]') || {}).content || '';
+  const STATIC = !!document.querySelector('meta[name="th-static"]');
+  const here = () => location.pathname.slice(BASE.length) || '/';
+  function staticApi(url, opts) {
+    if (url === '/api/settings') return fetch('data/settings.json').then(r => r.json());
+    if (url === '/api/products') return fetch('data/products.json').then(r => r.json());
+    if (url === '/api/subscribe') return Promise.resolve({ ok: true });
+    if (url === '/api/orders') {
+      const b = JSON.parse(opts.body), c = b.customer || {};
+      const items = (b.items || []).map(it => { const p = PRODUCTS.find(x => x.id === it.id); return p && { name: `${p.brand} ${p.name}`, color: p.color, size: it.size, qty: it.qty, price: priceOf(p) }; }).filter(Boolean);
+      const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0);
+      const freeOver = Number(S.free_delivery_over) || 0;
+      const fee = freeOver && subtotal >= freeOver ? 0 : Number(S.delivery_fee) || 0;
+      const number = 'TH' + Date.now().toString(36).toUpperCase().slice(-6);
+      const text = [`New order ${number}`, ...items.map(i => `${i.qty} x ${i.name}, ${i.color}, size ${i.size}: ${money(i.price * i.qty)}`),
+        `Delivery: ${fee ? money(fee) : 'free'}`, `Total cash on delivery: ${money(subtotal + fee)}`, '',
+        `Name: ${c.name}`, `Phone: ${c.phone}`, c.email ? `Email: ${c.email}` : '', `Area: ${c.city}`, `Address: ${c.address}`, c.notes ? `Notes: ${c.notes}` : ''].filter(x => x !== '').join('\n');
+      const wa = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(text)}`;
+      const w = window.open(wa, '_blank', 'noopener');
+      return Promise.resolve({ number, subtotal, delivery_fee: fee, total: subtotal + fee, items, via: 'whatsapp', wa, opened: !!w });
+    }
+    return Promise.reject(new Error('This action needs the full store server.'));
+  }
   async function api(url, opts = {}) {
+    if (STATIC) return staticApi(url, opts);
     const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || (r.status >= 500 ? "The store couldn't process that. Please try again in a moment." : "That request didn't go through. Please try again."));
@@ -135,7 +161,7 @@
   // ---------- router ----------
   function go(url, replace) {
     const swap = () => {
-      if (replace) history.replaceState({}, '', url); else history.pushState({}, '', url);
+      if (replace) history.replaceState({}, '', BASE + url); else history.pushState({}, '', BASE + url);
       render();
       window.scrollTo({ top: 0, behavior: 'instant' });
     };
@@ -156,7 +182,7 @@
     e.preventDefault();
     closeAll();
     const href = a.getAttribute('href');
-    if (href === location.pathname + location.search) return window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (href === here() + location.search) return window.scrollTo({ top: 0, behavior: 'smooth' });
     go(href);
   });
   window.addEventListener('popstate', render);
@@ -169,7 +195,7 @@
 
   function render() {
     timers.forEach(t => clearInterval(t)); timers.clear();
-    const path = location.pathname, q = new URLSearchParams(location.search);
+    const path = here(), q = new URLSearchParams(location.search);
     $$('.nav > a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === path + location.search));
     if (path !== '/') { $('#topbar').classList.remove('minimal'); if (pinObs) pinObs.disconnect(); const th = $('.pl-thumb'); if (th) th.classList.remove('on'); }
     if (path === '/') renderHome();
@@ -629,7 +655,7 @@
     $$('[data-dec]').forEach(b => b.onclick = () => { const l = lineAt(b.dataset.dec); l.qty = Math.max(1, l.qty - 1); afterCart(); });
     $$('[data-rm]').forEach(b => b.onclick = () => { const l = lineAt(b.dataset.rm); cart = cart.filter(x => x !== l); afterCart(); });
   }
-  function afterCart() { save('th_cart', cart); updateBadge(); renderDrawer(); if (location.pathname === '/checkout') renderCheckout(); }
+  function afterCart() { save('th_cart', cart); updateBadge(); renderDrawer(); if (here() === '/checkout') renderCheckout(); }
   function lockScroll(v) { document.documentElement.style.overflow = v ? 'hidden' : ''; }
   function openDrawer() { renderDrawer(); $('#drawer').classList.add('open'); $('#drawer').setAttribute('aria-hidden', 'false'); $('#scrim').hidden = false; lockScroll(true); }
   function closeAll() {
@@ -723,6 +749,18 @@
     const mine = o && o.number === num;
     document.title = 'Order placed — THREADS';
     const wa = encodeURIComponent(mine ? `Hi THREADS! I just placed order ${num} (${money(o.total)}). Name: ${o.customer.name}` : `Hi THREADS! About my order ${num}`);
+    if (mine && o.via === 'whatsapp') {
+      app.innerHTML = `<div class="wrap done">
+        <div class="done-badge">${ICON.check}</div>
+        <h1>Send it on WhatsApp</h1>
+        <div class="num">Order ${esc(num)}</div>
+        <p>Your order is written in a WhatsApp message to THREADS. Press send and it is placed. Have <b>${money(o.total)}</b> in cash ready on delivery.</p>
+        <div class="cta-row">
+          <a class="btn btn-green" target="_blank" rel="noopener" href="${esc(o.wa)}">${ICON.wa} Send order on WhatsApp</a>
+          <a class="btn btn-outline" href="/shop" data-link>Keep shopping</a>
+        </div></div>`;
+      return;
+    }
     app.innerHTML = `<div class="wrap done">
       <div class="done-badge">${ICON.check}</div>
       <h1>You're all set${mine ? ', ' + esc(o.customer.name.split(' ')[0]) : ''}!</h1>
@@ -831,7 +869,7 @@
       $('#wSubmit').disabled = false;
     };
     // first visit in this session: show the invite (skippable)
-    const quiet = /^\/(checkout|order|privacy)/.test(location.pathname);
+    const quiet = /^\/(checkout|order|privacy)/.test(here());
     if (S.welcome_popup === '1' && !member && !sess('th_skipped') && !quiet) {
       setTimeout(() => { if (!member && $('#welcome').hidden && $('#searchOv').hidden && !$('#drawer').classList.contains('open') && !sess('th_skipped')) openSignup(null); }, 3500);
     }

@@ -2,11 +2,12 @@
   "name": "threads-store",
   "version": "1.0.0",
   "private": true,
-  "description": "THREADS Activewear & Lifestyle — storefront with cash-on-delivery checkout and admin panel",
+  "description": "THREADS Activewear & Lifestyle \u2014 storefront with cash-on-delivery checkout and admin panel",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:pages": "node scripts/build-pages.js dist Threads_LB"
   },
   "engines": {
     "node": ">=20"

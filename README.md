@@ -33,6 +33,19 @@ The store starts with **8 products made from the shop's own photos** (On shorts 
 
 **About the lifestyle photos:** the homepage photos are from [Unsplash](https://unsplash.com/license), which is free for commercial use, loaded straight from Unsplash's CDN. They are *not* official Nike/Adidas/On/TNF campaign images, because those are copyrighted. If the brands or distributors provide official marketing assets, upload them in **Homepage**.
 
+## Free version on GitHub Pages
+
+The storefront also runs as plain files on GitHub Pages (no server): <https://juanius-ahos.github.io/Threads_LB/>
+
+- Checkout opens WhatsApp with the full order (items, sizes, total, name, phone, address) addressed to the shop's number, and the customer presses send.
+- Products and prices come from the local database at build time. After changing products in the admin, rebuild and push:
+
+```
+npm run build:pages
+```
+
+then publish the `dist` folder to the `gh-pages` branch. The admin panel, stock tracking and the sign-up list need the full server below.
+
 ## Put it online
 
 It's one Node app. All data (database + uploaded photos) lives in the `data/` folder, so the host **must have a persistent disk**.
