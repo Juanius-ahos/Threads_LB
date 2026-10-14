@@ -225,6 +225,8 @@
   // transparent cutouts of the shop's own photos: these stand on the 3D stand
   const CUTS = { 'TNF-SET-LAV': 'products/cut-tnf.webp', 'ON-SET-CRL': 'products/cut-on.webp', 'ON-SHT-BLK': 'products/cut-shorts-black.webp', 'ON-SHT-OLV': 'products/cut-shorts-olive.webp', 'ON-SHT-PLM': 'products/cut-shorts-plum.webp' };
   const cutOf = p => p.cutout || CUTS[p.sku] || '';
+  // athletes cut out of the brands' campaign photos (public/models, made by scripts/cutout-models.py)
+  const MODELS = (window.MODEL_CUTS || []);
 
   const HOME_DEFAULTS = window.HOME_DEFAULTS || {};
   const H = k => (HOME[k] != null && (!Array.isArray(HOME[k]) || HOME[k].length)) ? HOME[k] : HOME_DEFAULTS[k];
@@ -257,7 +259,15 @@
     const fee = Number(S.delivery_fee) || 0;
     const slides = HOME.slides || [];
     const lead = slides[0] || {};
-    const stage = PRODUCTS.filter(cutOf).map(p => ({ p, cut: cutOf(p) }));
+    const pieces = PRODUCTS.filter(cutOf).map(p => ({ p, cut: cutOf(p) }));
+    const people = MODELS.filter(m => !m.brand || PRODUCTS.some(p => p.brand.toLowerCase() === m.brand.toLowerCase()) || m.always)
+      .map(m => ({ model: m, cut: m.cut }));
+    // one athlete after every product or two, so the ring reads as people wearing the brands
+    const stage = [];
+    for (let i = 0, j = 0; i < pieces.length || j < people.length;) {
+      if (i < pieces.length) stage.push(pieces[i++]);
+      if (j < people.length && (stage.length % 2 === 1 || i >= pieces.length)) stage.push(people[j++]);
+    }
     const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
     const newIn = [...groups].sort((a, b) => b.some(p => p.featured) - a.some(p => p.featured) || new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
     const tiles = H('brands') || brandNames().map(name => ({ name }));
@@ -317,7 +327,7 @@
       <section class="duo" aria-label="Shop women and men">
         ${[['Women', HOME.women_image, 'adidas-squat'], ['Men', HOME.men_image, 'nike-run-man']].map(([g, url, art]) => `<a class="duo-tile" href="/shop?gender=${g}" data-link data-cursor="Shop">
           ${ownPic(url, art, '(max-width: 640px) 100vw, 50vw')}
-          <span class="duo-label"><b>${g}</b><span class="duo-n">${PRODUCTS.filter(p => p.gender === g || p.gender === 'Unisex').length} pieces</span></span>
+          <span class="duo-label"><b>${g}</b><span class="duo-n">${(n => n ? `${n} piece${n === 1 ? '' : 's'}` : 'Coming soon')(PRODUCTS.filter(p => p.gender === g || p.gender === 'Unisex').length)}</span></span>
         </a>`).join('')}
       </section>
 
@@ -430,12 +440,20 @@
     let cur = 0;
     const draw = i => {
       cur = (i + items.length) % items.length;
-      const { p } = items[cur];
+      const { p, model } = items[cur];
       const cap = $('#standCap');
       cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
       $('#standI').textContent = String(cur + 1).padStart(2, '0');
+      const name = $('#standName');
+      if (model) {
+        $('#standBrand').textContent = model.brand || 'THREADS';
+        name.textContent = model.label || `Shop ${model.brand}`;
+        name.setAttribute('href', model.link || `/shop?brand=${encodeURIComponent(model.brand)}`);
+        $('#standPrice').textContent = model.note || 'In store and online';
+        return;
+      }
       $('#standBrand').textContent = p.brand;
-      const name = $('#standName'); name.textContent = p.name; name.setAttribute('href', `/p/${p.slug}`);
+      name.textContent = p.name; name.setAttribute('href', `/p/${p.slug}`);
       $('#standPrice').innerHTML = `${money(priceOf(p))}${p.sale_price != null ? ` <s>${money(p.price)}</s>` : ''}`;
     };
     draw(0);

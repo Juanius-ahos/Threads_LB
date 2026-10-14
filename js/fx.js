@@ -158,9 +158,9 @@
           t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
           mat.map = t; mat.needsUpdate = true;
           const a = t.image.width / t.image.height;
-          const h = a < 0.7 ? 4.0 : 2.3 / a;            // sets stand tall, shorts sit smaller
+          const h = it.model ? (a > 0.9 ? 3.3 : 4.6) : a < 0.7 ? 4.0 : 2.3 / a;   // athletes tallest (a crouch less so), sets stand tall, shorts smaller
           mesh.scale.set(h * a, h, 1);
-          mesh.userData.lift = a < 0.7 ? 0 : 0.9;        // shorts float at hip height
+          mesh.userData.lift = it.model || a < 0.7 ? 0 : 0.9;  // shorts float at hip height
         });
         mesh.userData.angle = (i / n) * Math.PI * 2;
         const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.9), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
@@ -205,7 +205,7 @@
         const wide = camera.aspect > 1.15;
         // on wide screens the stand sits in the right half, clear of the headline
         const halfW = (camera.position.z - R) * Math.tan(camera.fov * Math.PI / 360) * camera.aspect;
-        sx += ((wide ? halfW * 0.5 : 0) - sx) * 0.2;
+        sx += ((wide ? halfW * 0.62 : 0) - sx) * 0.2;
         // on phones the stand is smaller and sits under the headline
         const floor = FLOOR;
         const rise = Math.min(1, Math.max(0, (performance.now() - born) / 1700)), up = 1 - Math.pow(1 - rise, 3);
@@ -231,6 +231,8 @@
         spot.material.opacity = 0.55 + Math.sin(t * 2) * 0.25;
 
         E.group.position.x += ((wide ? sx * 1.5 : 0) - E.group.position.x) * 0.2;
+        E.group.position.y += ((wide ? 0.8 : -2.5) - E.group.position.y) * 0.2;
+        E.group.scale.setScalar(E.group.scale.x + ((wide ? 1.8 : 0.95) - E.group.scale.x) * 0.2);
         E.group.rotation.y = -0.35 + ptr.x * 0.12 + Math.sin(t * 0.3) * 0.05;
         E.group.rotation.x = 0.05 + ptr.y * 0.06;
         E.bars.forEach((b, i) => {
@@ -495,7 +497,7 @@
       // where each bar travels to when its promise is told (x, y, rotation)
       const wide = () => s.camera.aspect > 1.1;
       // wide screens: the bars spread down the right half, the promises read down the left
-      const AWAY = () => wide() ? [[0, 2.5, -0.25], [0, 0, 0.25], [0, -2.5, -0.25]] : [[0, 2.6, -0.2], [0, 0.2, 0.2], [0, -2.2, -0.2]];
+      const AWAY = () => wide() ? [[0, 2.5, -0.25], [0, 0, 0.25], [0, -2.5, -0.25]] : [[0.3, 1.5, -0.2], [0, 0, 0.2], [-0.3, -1.5, -0.2]];
       let sp = 0;
       s.onTick(t => {
         sp += (p - sp) * 0.08;
@@ -510,6 +512,8 @@
           b.rotation.set(Math.sin(t * 0.7 + i) * 0.08, ar * k + Math.sin(t * 0.5 + i) * 0.1, ar * k * 0.4);
         });
         E.group.position.x += ((wide() ? 2.8 * open : 0) - E.group.position.x) * 0.1;
+        E.group.position.y += ((wide() ? 0 : 2.1) - E.group.position.y) * 0.1;
+        E.group.scale.setScalar(E.group.scale.x + ((wide() ? 1 : 0.6) - E.group.scale.x) * 0.1);
         E.group.rotation.y = ptr.x * 0.25 + Math.sin(t * 0.4) * 0.12;
         E.group.rotation.x = ptr.y * 0.12;
       });
