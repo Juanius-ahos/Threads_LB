@@ -225,8 +225,8 @@
   // transparent cutouts of the shop's own photos: these stand on the 3D stand
   const CUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
   const cutOf = p => p.cutout || CUTS[p.sku] || '';
-  // athletes cut out of the brands' campaign photos (public/models, made by scripts/cutout-models.py)
-  const MODELS = (window.MODEL_CUTS || []);
+  // the hero stand shows the brands the shop carries, as 3D logos (outlines in js/logo-shapes.js)
+  const LOGO_KEY = b => ({ nike: 'nike', adidas: 'adidas', on: 'on', 'the north face': 'tnf' })[String(b).toLowerCase()];
 
   const HOME_DEFAULTS = window.HOME_DEFAULTS || {};
   const H = k => (HOME[k] != null && (!Array.isArray(HOME[k]) || HOME[k].length)) ? HOME[k] : HOME_DEFAULTS[k];
@@ -259,15 +259,7 @@
     const fee = Number(S.delivery_fee) || 0;
     const slides = HOME.slides || [];
     const lead = slides[0] || {};
-    const pieces = PRODUCTS.filter(cutOf).map(p => ({ p, cut: cutOf(p) }));
-    const people = MODELS.filter(m => !m.brand || PRODUCTS.some(p => p.brand.toLowerCase() === m.brand.toLowerCase()) || m.always)
-      .map(m => ({ model: m, cut: m.cut }));
-    // one athlete after every product or two, so the ring reads as people wearing the brands
-    const stage = [];
-    for (let i = 0, j = 0; i < pieces.length || j < people.length;) {
-      if (i < pieces.length) stage.push(pieces[i++]);
-      if (j < people.length && (stage.length % 2 === 1 || i >= pieces.length)) stage.push(people[j++]);
-    }
+    const stage = brandNames().filter(LOGO_KEY).map(b => ({ brand: b, logo: LOGO_KEY(b), cut: brandLogo(b) }));
     const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
     const newIn = [...groups].sort((a, b) => b.some(p => p.featured) - a.some(p => p.featured) || new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
     const tiles = H('brands') || brandNames().map(name => ({ name }));
@@ -440,16 +432,17 @@
     let cur = 0;
     const draw = i => {
       cur = (i + items.length) % items.length;
-      const { p, model } = items[cur];
+      const { p, brand } = items[cur];
       const cap = $('#standCap');
       cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
       $('#standI').textContent = String(cur + 1).padStart(2, '0');
       const name = $('#standName');
-      if (model) {
-        $('#standBrand').textContent = model.brand || 'THREADS';
-        name.textContent = model.label || `Shop ${model.brand}`;
-        name.setAttribute('href', model.link || `/shop?brand=${encodeURIComponent(model.brand)}`);
-        $('#standPrice').textContent = model.note || 'In store and online';
+      if (brand) {
+        const n = PRODUCTS.filter(x => x.brand.toLowerCase() === brand.toLowerCase()).length;
+        $('#standBrand').textContent = 'Original';
+        name.textContent = `Shop ${BRAND_NAME[brand.toLowerCase()] || brand}`;
+        name.setAttribute('href', `/shop?brand=${encodeURIComponent(brand)}`);
+        $('#standPrice').textContent = n ? `${n} piece${n === 1 ? '' : 's'} in stock` : 'New pieces coming soon';
         return;
       }
       $('#standBrand').textContent = p.brand;
