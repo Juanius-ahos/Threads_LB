@@ -195,9 +195,9 @@
 
   function render() {
     timers.forEach(t => clearInterval(t)); timers.clear();
+    if (window.FX) FX.leave();
     const path = here(), q = new URLSearchParams(location.search);
     $$('.nav > a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === path + location.search));
-    if (path !== '/') { $('#topbar').classList.remove('minimal'); if (pinObs) pinObs.disconnect(); const th = $('.pl-thumb'); if (th) th.classList.remove('on'); }
     if (path === '/') renderHome();
     else if (path === '/shop') renderShop(q);
     else if (path.startsWith('/p/')) renderProduct(decodeURIComponent(path.slice(3)));
@@ -206,150 +206,194 @@
     else if (path.startsWith('/order/')) renderDone(decodeURIComponent(path.slice(7)));
     else { setOver(false); app.innerHTML = `<div class="wrap empty"><h3>Page not found</h3><a href="/" data-link class="btn btn-dark">Back home</a></div>`; }
     reveal();
+    if (window.FX) FX.enter(path, app);
   }
 
-  // ---------- home: the pinned poster ----------
-  // Built from the live catalogue, so it follows whatever the owner stocks.
-  const FULL = { 'NK-SET-WHT': '/products/full-nike.webp', 'ON-SHT-OLV': '/products/full-olive.webp' };
-  const PAPER = { 'TNF-SET-LAV': '#eeeae7', 'ON-SET-CRL': '#e7e5e1', 'ON-SHT-OLV': '#f3efea', 'ON-SHT-BLS': '#efece9', 'ON-SHT-CRM': '#f1efec', 'ON-SHT-BLK': '#f4f0ed', 'ON-SHT-PLM': '#f4f0eb' };
-  const LEBANON = [
-    { verb: 'Order', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/Beirut_Corniche%2C_Beirut%2C_Lebanon.jpg/1920px-Beirut_Corniche%2C_Beirut%2C_Lebanon.jpg', credit: 'Beirut Corniche, Vyacheslav Argenberg, CC BY 4.0' },
-    { verb: 'Confirm', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Beirut_Corniche_at_Night.JPG/1920px-Beirut_Corniche_at_Night.JPG', credit: 'Beirut Corniche at night, Wusel007, CC BY-SA 3.0' },
-    { verb: 'Deliver', img: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/56/Zig-zag_lebanese_mountain_road.jpg/1920px-Zig-zag_lebanese_mountain_road.jpg', credit: 'Mountain road, Peripitus, CC BY-SA 3.0' },
-    { verb: 'Pay', img: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Aley_Lebanon_Houses_and_hillside.jpg', credit: 'Aley, Peripitus, CC BY-SA 3.0' },
+  // ---------- home ----------
+  // Campaign photography (official brand imagery, see campaign/SOURCES.md). Anything the owner sets
+  // in Admin → Homepage replaces these; the old placeholder photos count as "not set".
+  const C = n => `/campaign/${n}.webp`, Cs = n => `/campaign/${n}-sm.webp`;
+  const OLD_DEFAULTS = /images\.unsplash\.com\/photo-(1574680088814|1552674605|1608748180154|1726195222023|1511746315387|1718248028293|1618329918461|1556705634|1784924176852|1541534741688)/;
+  const own = (url, fallback) => url && !OLD_DEFAULTS.test(url) ? src(url, 1800) : fallback;
+  const BRAND_ART = { nike: 'nike-vest', adidas: 'adidas-studio', on: 'on-jump', 'the north face': 'tnf-orange' };
+  const BRAND_NAME = { nike: 'Nike', adidas: 'adidas', on: 'On', 'the north face': 'The North Face' };
+  const SPORTS = [
+    { name: 'Running', img: 'nike-run-group', link: '/shop?category=Shorts' },
+    { name: 'Training', img: 'adidas-gym', link: '/shop?category=Tracksuits' },
+    { name: 'Outdoor', img: 'tnf-puffer', link: '/shop?brand=The%20North%20Face' },
+    { name: 'Lifestyle', img: 'on-lifestyle', link: '/shop' },
   ];
-  const E_SVG = '<svg class="pin-e" viewBox="0 0 100 100" aria-hidden="true"><path d="M30 0h70l-9 22H21z" fill="currentColor"/><path class="mid" d="M18 39h70l-9 22H9z"/><path d="M6 78h70l-9 22H-3z" fill="currentColor"/></svg>';
-  const sizeList = p => p.sizes.map(s => s.stock > 0 ? esc(s.size) : `<s>${esc(s.size)}</s>`).join(' ');
-  const VERB_TEXT = (fee, freeOver) => [
-    'Pick your size and place the order in a minute. No account, no card.',
-    'We call or message you on WhatsApp to confirm the order and your address.',
-    `Our driver brings it anywhere in Lebanon, from Beirut to the mountains. Delivery is ${money(fee)}${freeOver ? `, free over ${money(freeOver)}` : ''}.`,
-    'Pay cash at your door when it arrives. That is the whole process.',
+  const BANNERS = ['nike-trail-run', 'tnf-summit'];
+  // transparent cutouts of the shop's own photos: these stand on the 3D stage
+  const CUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
+  const STEPS = ['Order', 'Confirm', 'Deliver', 'Pay'];
+  const STEP_TEXT = (fee, freeOver) => [
+    'Pick your size and order in a minute. No account, no card.',
+    'We message you on WhatsApp to confirm your order and address.',
+    `Our driver brings it anywhere in Lebanon. Delivery ${money(fee)}${freeOver ? `, free over ${money(freeOver)}` : ''}.`,
+    'Pay cash at your door when it arrives.',
   ];
+  const pic = (name, alt = '', sizes = '100vw', lazy = true) => `<img src="${C(name)}" srcset="${Cs(name)} 900w, ${C(name)} 1800w" sizes="${sizes}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
+  const ownPic = (url, name, sizes) => url && !OLD_DEFAULTS.test(url) ? `<img src="${esc(src(url, 1600))}" ${srcset(url, [800, 1200, 1800])} sizes="${sizes}" alt="" loading="lazy">` : pic(name, '', sizes);
+  const logoRow = () => BRANDS.map(b => `<a href="/shop?brand=${encodeURIComponent(b)}" data-link><img src="${brandLogo(b)}" alt="${esc(b)}"></a>`).join('');
 
   function renderHome() {
     document.title = 'THREADS — Activewear & Lifestyle';
     const groups = groupsOf(PRODUCTS);
-    const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
-    const singles = groups.filter(g => g !== live).map(g => g[0]);
-    const featured = singles.filter(p => p.featured).concat(singles.filter(p => !p.featured));
-    const first = PRODUCTS.find(p => p.sku === 'TNF-SET-LAV') || featured[0] || live[0];
-    const pinned = featured.filter(p => p !== first)[0];
-    const show = [PRODUCTS.find(p => p.sku === 'NK-SET-WHT'), live.find(p => FULL[p.sku])].filter(Boolean);
-    for (const p of featured) { if (show.length >= 2) break; if (!show.includes(p) && p !== first && p !== pinned) show.push(p); }
-    const intro = ((HOME.slides || [])[0] || {}).text || 'Original Nike, Adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.';
     const freeOver = Number(S.free_delivery_over) || 0;
     const fee = Number(S.delivery_fee) || 0;
-    const byBrand = [...new Set(PRODUCTS.map(p => p.brand))].map(b => [b, PRODUCTS.filter(p => p.brand === b)]);
-    const frameImgs = PRODUCTS.filter(p => p.images[0]);
-    const off = p => p.sale_price != null ? `<s>${money(p.price)}</s>` : '';
-    const words = VERB_TEXT(fee, freeOver);
     const cities = (S.cities || '').split(',').map(c => c.trim()).filter(Boolean).slice(0, 8).join(', ');
+    const slides = HOME.slides || [];
+    const lead = slides[0] || {};
+    const stage = PRODUCTS.filter(p => CUTS[p.sku]).map(p => ({ p, cut: CUTS[p.sku] }));
+    const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
+    const newIn = [...groups].sort((a, b) => new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
+    const tiles = (HOME.brands || []).length ? HOME.brands : BRANDS.map(name => ({ name }));
+    const inBrand = b => PRODUCTS.filter(p => p.brand.toLowerCase() === b.toLowerCase()).length;
+    const tickerBits = String(HOME.ticker || 'Cash on delivery · 100% original · Delivery all over Lebanon').split('·').map(t => t.trim()).filter(Boolean);
+    const tickerRun = `<span>${tickerBits.map(t => `${esc(t)}<i></i>`).join('')}</span>`.repeat(3);
+    const banner = (sl, i) => sl && (sl.title || sl.text) ? `<section class="banner">
+        ${ownPic(sl.image, BANNERS[i], '100vw')}
+        <div class="banner-copy">
+          ${sl.title ? `<h2>${rich(sl.title)}</h2>` : ''}
+          ${sl.text ? `<p>${esc(sl.text)}</p>` : ''}
+          <div class="cta-row">
+            ${sl.button ? `<a class="btn btn-green" href="${esc(sl.link || '/shop')}" data-link>${esc(sl.button)}</a>` : ''}
+            ${sl.button2 ? `<a class="btn btn-ghost-d" href="${esc(sl.link2 || '/shop')}" data-link>${esc(sl.button2)}</a>` : ''}
+          </div>
+        </div>
+      </section>` : '';
+    const words = STEP_TEXT(fee, freeOver);
 
     app.innerHTML = `
-      <section class="pin" id="pin" aria-label="THREADS">
-        <h1 class="sr-only">THREADS Activewear &amp; Lifestyle: original Nike, Adidas, On and The North Face with cash on delivery in Lebanon</h1>
-        <div class="pin-layer" aria-hidden="true">
-          <div class="pin-word pin-a">THR${E_SVG}</div>
-          <div class="pin-word pin-b">ADS</div>
-        </div>
-
-        <div class="pin-panel panel-first">
-          <div class="pf-main">
-            <div class="pf-text rise">
-              <p>${esc(intro)}</p>
-              <div class="cta-row">
-                <a class="btn btn-green" href="/shop" data-link>Shop the collection</a>
-                <a class="link" href="/shop?gender=Women" data-link>Women</a>
-              </div>
-            </div>
-            <nav class="pf-links" aria-label="Shop by">
-              <a href="/shop?gender=Women" data-link>Women</a>
-              <a href="/shop?gender=Men" data-link>Men</a>
-              <a href="/shop?sale=1" data-link>Sale</a>
-            </nav>
+      <section class="hero" id="hero">
+        <div class="hero-gl" aria-hidden="true"></div>
+        ${stage.length ? `<img class="hero-flat" src="${stage[0].cut}" alt="" aria-hidden="true">` : ''}
+        <div class="hero-copy">
+          <p class="hero-kicker">Activewear &amp; lifestyle · Lebanon</p>
+          <h1>${lead.title ? rich(lead.title) : 'Move your <em>way.</em>'}</h1>
+          <p class="hero-sub">${esc(lead.text || 'Original Nike, Adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.')}</p>
+          <div class="cta-row">
+            <a class="btn btn-green" href="/shop?gender=Women" data-link>Shop women</a>
+            <a class="btn btn-ghost-d" href="/shop?gender=Men" data-link>Shop men</a>
           </div>
-          ${first ? `<a class="pf-photo" href="/p/${esc(first.slug)}" data-link aria-label="${esc(`${first.brand} ${first.name}`)}"><img src="${esc(first.images[0])}" alt="${esc(`${first.brand} ${first.name} in ${first.color}`)}" fetchpriority="high"></a>` : '<div class="pf-photo"></div>'}
+          <nav class="hero-brands" aria-label="Brands">${logoRow()}</nav>
         </div>
-
-        ${live.length ? `<div class="pin-panel panel-live" id="live" style="--panel:${PAPER[live[0].sku] || '#f1eeea'}">
-          <div class="live-photo">${live.map((p, i) => `<img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name} in ${p.color}`)}" data-v="${i}" class="${i ? 'out' : ''}">`).join('')}</div>
-          <div class="live-info rise">
-            <h2>${esc(live[0].name).replace(/-/g, '\u2011')}</h2>
-            <p>${esc(live[0].brand)}, in ${live.length} colours. Pick one.</p>
-            <div class="live-price tnum" id="livePrice"></div>
-            <div class="swatch-row" role="group" aria-label="Colour">${live.map((p, i) => `<button type="button" class="swatch" style="--c:${esc(hexOf(p))}" data-v="${i}" aria-pressed="${i === 0}" aria-label="${esc(p.color)}"></button>`).join('')}</div>
-            <p class="live-colour" id="liveColour"></p>
-            <div class="live-sizes" id="liveSizes" role="group" aria-label="Size"></div>
-            <p class="live-note" id="liveNote" aria-live="polite"></p>
-            <div class="cta-row"><button class="btn btn-green" id="liveAdd">Add to bag</button><a class="link" id="liveLink" data-link>Details</a></div>
+        ${stage.length ? `<div class="hero-stand" id="stand" aria-live="polite">
+          <div class="stand-cap" id="standCap">
+            <span class="stand-brand" id="standBrand"></span>
+            <a class="stand-name" id="standName" data-link></a>
+            <span class="stand-price tnum" id="standPrice"></span>
           </div>
-        </div>` : ''}
-
-        ${pinned ? `<div class="pin-panel panel-photo" style="--panel:${PAPER[pinned.sku] || '#e9e7e3'}">
-          <a class="pp-photo" href="/p/${esc(pinned.slug)}" data-link><img src="${esc(pinned.images[0])}" alt="${esc(`${pinned.brand} ${pinned.name} in ${pinned.color}`)}" loading="lazy"></a>
-          <p class="pp-cap">${esc(pinned.brand)} ${esc(pinned.name)} in ${esc(pinned.color.toLowerCase())}, ${money(priceOf(pinned))}${pinned.sale_price != null ? ` instead of ${money(pinned.price)}` : ''}. <a href="/p/${esc(pinned.slug)}" data-link>See it</a></p>
+          <div class="stand-nav">
+            <button type="button" class="icon-btn" data-stand="-1" aria-label="Previous piece"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
+            <span class="stand-count tnum"><b id="standI">01</b> / ${String(stage.length).padStart(2, '0')}</span>
+            <button type="button" class="icon-btn" data-stand="1" aria-label="Next piece"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+          </div>
+          <p class="stand-hint">Drag to spin</p>
         </div>` : ''}
       </section>
 
-      ${show.map((p, i) => `<section class="sc-frame">
-        <img src="${esc(FULL[p.sku] || p.images[0])}" alt="" loading="lazy">
-        <div class="sc-card c${i + 2} rise">
-          ${i === 0 ? `<h2>${esc(p.name)}</h2>` : `<h3>${esc(p.name)}</h3>`}
-          <p>${esc(p.brand)}, ${esc(p.color.toLowerCase())}</p>
-          <p class="tnum">${money(priceOf(p))} ${p.sale_price != null ? `<s style="opacity:.6">${money(p.price)}</s>` : ''}</p>
-          <div class="whole"><img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name}`)}" loading="lazy"></div>
-          <a class="btn btn-green" href="/p/${esc(p.slug)}" data-link>Choose your size</a>
-        </div>
-      </section>`).join('')}
+      <div class="ticker"><p class="sr-only">${esc(tickerBits.join(', '))}</p><div class="ticker-run" aria-hidden="true">${tickerRun}${tickerRun}</div></div>
 
-      <section class="pricelist" aria-label="Everything in stock">
-        <h2 class="sr-only">Everything in stock</h2>
-        ${byBrand.map(([b, list]) => `<div class="pl-group">
-          <h3 class="pl-brand">${esc(b)}</h3>
-          ${list.map(p => `<a class="pl-row" href="/p/${esc(p.slug)}" data-link data-img="${esc(p.images[0] || '')}">
-            <span>${esc(p.name)}, ${esc(p.color.toLowerCase())}</span>
-            <span class="pl-cat">${esc(p.category)}</span>
-            <span class="pl-sizes">${p.stock ? sizeList(p) : 'Sold out'}</span>
-            <span class="pl-price">${off(p)}${money(priceOf(p))}</span>
+      <section class="duo" aria-label="Shop women and men">
+        ${[['Women', HOME.women_image, 'adidas-squat'], ['Men', HOME.men_image, 'nike-run-man']].map(([g, url, art]) => `<a class="duo-tile" href="/shop?gender=${g}" data-link>
+          ${ownPic(url, art, '(max-width: 640px) 100vw, 50vw')}
+          <span class="duo-label"><b>${g}</b><span class="btn btn-white">Shop ${g.toLowerCase()}</span></span>
+        </a>`).join('')}
+      </section>
+
+      <section class="rail-sec">
+        <div class="sec-row"><h2 class="h-sec">New in</h2><a class="link" href="/shop" data-link>View all</a></div>
+        <div class="rail" id="rail">${newIn.map(v => card(v)).join('')}</div>
+        <div class="rail-btns"><button type="button" class="icon-btn" data-rail="-1" aria-label="Scroll left"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" class="icon-btn" data-rail="1" aria-label="Scroll right"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
+      </section>
+
+      ${banner(slides[1], 0)}
+
+      <section class="brand-sec">
+        <div class="sec-row"><h2 class="h-sec">Shop by brand</h2></div>
+        <div class="brand-grid">
+          ${tiles.map(b => `<a class="brand-tile" href="/shop?brand=${encodeURIComponent(b.name)}" data-link>
+            ${ownPic(b.image, BRAND_ART[b.name.toLowerCase()] || 'nike-vest', '(max-width: 640px) 50vw, 25vw')}
+            <span class="brand-tile-in">
+              <img class="brand-tile-logo" src="${brandLogo(b.name)}" alt="${esc(b.name)}">
+              <span class="brand-tile-tag">${esc(BRAND_NAME[b.name.toLowerCase()] || b.name)}</span>
+              <span class="brand-tile-n">${inBrand(b.name) ? `${inBrand(b.name)} ${inBrand(b.name) === 1 ? 'piece' : 'pieces'}` : 'Coming soon'}</span>
+            </span>
           </a>`).join('')}
-        </div>`).join('')}
+        </div>
       </section>
 
-      <section aria-label="How ordering works">
-        <h2 class="sr-only">How ordering works</h2>
-        ${LEBANON.map((v, i) => `<div class="verb-panel">
-          <img src="${v.img}" alt="" loading="lazy">
-          <div class="verb-word">${v.verb}</div>
-          <p class="verb-text">${words[i]}</p>
-          <span class="verb-credit">${esc(v.credit)}</span>
-        </div>`).join('')}
-      </section>
-
-      ${frameImgs.length ? `<section class="frame-sec" aria-label="Every piece in stock">
-        <p class="frame-intro rise"><span>${frameImgs.length} pieces in stock right now. Tap to see the next one.</span></p>
-        <div class="frame" id="frame" role="button" tabindex="0" aria-label="Next piece">${frameImgs.map((p, i) => `<img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name} in ${p.color}`)}" class="${i ? '' : 'on'}" loading="lazy">`).join('')}</div>
-        <p class="frame-cap" id="frameCap" aria-live="polite"></p>
+      ${live.length > 1 ? `<section class="pick" id="live">
+        <div class="pick-photo live-photo">${live.map((p, i) => `<img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name} in ${p.color}`)}" data-v="${i}" class="${i ? 'out' : ''}" loading="lazy">`).join('')}</div>
+        <div class="pick-info">
+          <p class="hero-kicker">${esc(live[0].brand)} · ${live.length} colours</p>
+          <h2 class="h-sec">${esc(live[0].name).replace(/-/g, '‑')}</h2>
+          <div class="live-price tnum" id="livePrice"></div>
+          <div class="swatch-row" role="group" aria-label="Colour">${live.map((p, i) => `<button type="button" class="swatch" style="--c:${esc(hexOf(p))}" data-v="${i}" aria-pressed="${i === 0}" aria-label="${esc(p.color)}"></button>`).join('')}</div>
+          <p class="live-colour" id="liveColour"></p>
+          <div class="live-sizes" id="liveSizes" role="group" aria-label="Size"></div>
+          <p class="live-note" id="liveNote" aria-live="polite"></p>
+          <div class="cta-row"><button class="btn btn-green" id="liveAdd">Add to bag</button><a class="link" id="liveLink" data-link>Full details</a></div>
+        </div>
       </section>` : ''}
 
+      <section class="sport-sec">
+        <div class="sec-row"><h2 class="h-sec">Shop by sport</h2></div>
+        <div class="sport-grid">${SPORTS.map(s => `<a class="sport-tile" href="${s.link}" data-link>${pic(s.img, '', '(max-width: 640px) 50vw, 25vw')}<span>${s.name}</span></a>`).join('')}</div>
+      </section>
+
+      ${banner(slides[2], 1)}
+
+      <section class="how" aria-label="How ordering works">
+        <div class="sec-row"><h2 class="h-sec">Cash on delivery. <em>All over Lebanon.</em></h2></div>
+        <ol class="how-steps">${STEPS.map((s, i) => `<li><b class="tnum">0${i + 1}</b><h3>${s}</h3><p>${words[i]}</p></li>`).join('')}</ol>
+      </section>
+
       <section class="faq">
-        <h2 class="rise"><span>Before you order</span></h2>
+        <h2 class="h-sec">Questions</h2>
         <div class="faq-list">
           <details><summary>How do I pay?</summary><p>In cash, when the order reaches you. You never enter a card on this site.</p></details>
           <details><summary>How much is delivery, and where do you deliver?</summary><p>${money(fee)} anywhere in Lebanon${freeOver ? `, and free when your order is over ${money(freeOver)}` : ''}. We deliver to ${esc(cities)} and the rest of the country.</p></details>
-          <details><summary>What happens after I order?</summary><p>We call or message you on WhatsApp to confirm the order and your address, then our driver brings it to you.</p></details>
-          <details><summary>What if the size is wrong?</summary><p>Message us on WhatsApp within a few days of delivery. If the piece is unworn with its tags on, we arrange a size swap.</p></details>
+          <details><summary>What happens after I order?</summary><p>We message you on WhatsApp to confirm the order and your address, then our driver brings it to you.</p></details>
+          <details><summary>What if the size is wrong?</summary><p>Message us on WhatsApp within a few days of delivery. If the piece is unworn with its tags on, we swap the size.</p></details>
           <details><summary>Are the products original?</summary><p>Yes. Everything we sell is original Nike, Adidas, On and The North Face.</p></details>
           <details><summary>Can I order on WhatsApp instead?</summary><p>Yes. Send us the product name and your size on <a class="link" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a> and we take it from there.</p></details>
         </div>
+      </section>
+
+      <section class="ig">
+        <img src="/brand/logo-circle.jpg" alt="" loading="lazy">
+        <div><h2 class="h-sec">Join the crew</h2><p>New drops, restocks and styling, first on Instagram.</p></div>
+        <a class="btn btn-green" href="${esc(S.instagram || '#')}" target="_blank" rel="noopener">Follow @threadsactivewear</a>
       </section>`;
 
+    wireStand(stage);
     wireLive(live);
-    wireFrame(frameImgs);
-    wirePriceList();
-    wireMinimalBar();
+    wireRail();
   }
 
+  // the 3D stand: caption, arrows and dragging; FX does the drawing
+  function wireStand(items) {
+    const box = $('#stand'); if (!box) return;
+    let cur = 0;
+    const draw = i => {
+      cur = (i + items.length) % items.length;
+      const { p } = items[cur];
+      const cap = $('#standCap');
+      cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
+      $('#standI').textContent = String(cur + 1).padStart(2, '0');
+      $('#standBrand').textContent = p.brand;
+      const name = $('#standName'); name.textContent = p.name; name.setAttribute('href', `/p/${p.slug}`);
+      $('#standPrice').innerHTML = `${money(priceOf(p))}${p.sale_price != null ? ` <s>${money(p.price)}</s>` : ''}`;
+    };
+    draw(0);
+    const ctl = window.FX ? FX.stand($('#hero'), items, draw) : null;
+    $$('[data-stand]', box).forEach(b => b.onclick = () => { if (ctl) ctl.go(+b.dataset.stand); else draw(cur + +b.dataset.stand); });
+  }
+
+  const PAPER = { 'ON-SHT-OLV': '#f3efea', 'ON-SHT-BLS': '#efece9', 'ON-SHT-CRM': '#f1efec', 'ON-SHT-BLK': '#f4f0ed', 'ON-SHT-PLM': '#f4f0eb' };
   function wireLive(variants) {
     const box = $('#live'); if (!box) return;
     let v = 0, size = null;
@@ -376,41 +420,6 @@
       gate(() => addToCart(p, chosen, 1, true));
     };
     draw();
-  }
-
-  function wireFrame(list) {
-    const frame = $('#frame'); if (!frame) return;
-    const imgs = $$('img', frame); let i = 0;
-    const cap = () => { const p = list[i]; $('#frameCap').textContent = `${p.brand} ${p.name}, ${p.color.toLowerCase()}, ${money(priceOf(p))}`; };
-    const next = () => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); cap(); };
-    cap();
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const t = setInterval(() => { if (document.body.contains(frame)) next(); }, 2400); timers.add(t);
-    }
-    frame.onclick = next;
-    frame.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); } };
-  }
-
-  function wirePriceList() {
-    if (!matchMedia('(hover: hover)').matches) return;
-    let thumb = $('.pl-thumb');
-    if (!thumb) { thumb = document.createElement('div'); thumb.className = 'pl-thumb'; thumb.innerHTML = '<img alt="">'; document.body.appendChild(thumb); }
-    $$('.pl-row').forEach(r => {
-      r.addEventListener('mouseenter', () => { if (!r.dataset.img) return; thumb.firstChild.src = r.dataset.img; thumb.classList.add('on'); });
-      r.addEventListener('mousemove', e => { thumb.style.left = e.clientX + 'px'; thumb.style.top = e.clientY + 'px'; });
-      r.addEventListener('mouseleave', () => thumb.classList.remove('on'));
-    });
-  }
-
-  // The pinned name stands in for the logo, so the bar shows only its actions until the pin has passed.
-  let pinObs = null;
-  function wireMinimalBar() {
-    const bar = $('#topbar'), pin = $('#pin');
-    if (pinObs) pinObs.disconnect();
-    if (!pin) { bar.classList.remove('minimal'); return; }
-    bar.classList.add('minimal');
-    pinObs = new IntersectionObserver(([en]) => bar.classList.toggle('minimal', en.isIntersecting), { rootMargin: `0px 0px -${Math.max(0, innerHeight - 80)}px 0px` });
-    pinObs.observe(pin);
   }
 
   function wireRail() {
@@ -513,7 +522,7 @@
             ${p.stock > 0 ? `
             <div class="buy-row">
               <div class="qty"><button id="qMinus" aria-label="Less">−</button><span id="qVal">1</span><button id="qPlus" aria-label="More">+</button></div>
-              <button class="btn btn-dark" id="addBtn">Add to bag, ${money(priceOf(p))}</button>
+              <button class="btn btn-green" id="addBtn">Add to bag, ${money(priceOf(p))}</button>
             </div>` : `<button class="btn btn-dark btn-block" disabled style="margin-top:18px">Sold out</button>`}
             <a class="btn btn-wa btn-block wa-row" data-gate target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${waText}">${ICON.wa} ${p.stock > 0 ? 'Ask about this on WhatsApp' : "Ask when it's back"}</a>
             <div class="pdp-perks">
@@ -871,7 +880,11 @@
     // first visit in this session: show the invite (skippable)
     const quiet = /^\/(checkout|order|privacy)/.test(here());
     if (S.welcome_popup === '1' && !member && !sess('th_skipped') && !quiet) {
-      setTimeout(() => { if (!member && $('#welcome').hidden && $('#searchOv').hidden && !$('#drawer').classList.contains('open') && !sess('th_skipped')) openSignup(null); }, 3500);
+      // not over the first screen: once they've scrolled past it, or after 20 seconds
+      const invite = () => { removeEventListener('scroll', onScroll); clearTimeout(t); if (!member && $('#welcome').hidden && $('#searchOv').hidden && !$('#drawer').classList.contains('open') && !sess('th_skipped') && !document.documentElement.classList.contains('th-intro')) openSignup(null); };
+      const onScroll = () => { if (scrollY > innerHeight * 0.9) invite(); };
+      const t = setTimeout(invite, 20000);
+      addEventListener('scroll', onScroll, { passive: true });
     }
   }
 

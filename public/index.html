@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>THREADS — Activewear & Lifestyle</title>
   <meta name="description" content="THREADS Activewear & Lifestyle, Lebanon. Nike, Adidas, On and The North Face. Cash on delivery all over Lebanon.">
-  <meta name="theme-color" content="#c9cacc">
+  <meta name="theme-color" content="#000000">
   <meta property="og:title" content="THREADS — Activewear & Lifestyle">
   <meta property="og:description" content="Nike, Adidas, On & The North Face. Cash on delivery all over Lebanon.">
   <meta property="og:image" content="/brand/logo-circle.jpg">
@@ -15,18 +15,25 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://thumb.wikimedia.org">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
-  <script>document.documentElement.classList.add('js')</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wdth,wght@0,50..125,100..900;1,50..125,100..900&display=swap" rel="stylesheet">
+  <script>document.documentElement.classList.add('js');try{if(!sessionStorage.getItem('th_intro')&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('th-intro')}catch(e){}</script>
   <link rel="stylesheet" href="/css/store.css">
 </head>
 <body>
+  <!-- first visit in a session: the three bars lock into the E, then the curtain lifts -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-word"><span class="iw"><span>THR</span></span><span class="intro-e"><svg class="b b1" viewBox="0 0 100 100"><path d="M30 0h70l-9 22H21z"/></svg><svg class="b b2" viewBox="0 0 100 100"><path d="M18 39h70l-9 22H9z"/></svg><svg class="b b3" viewBox="0 0 100 100"><path d="M6 78h70l-9 22H-3z"/></svg></span><span class="iw"><span>ADS</span></span></div>
+  </div>
+  <!-- page change -->
+  <div class="wipe" id="wipe" aria-hidden="true" hidden><span class="wipe-e"><svg class="b b1" viewBox="0 0 100 100"><path d="M30 0h70l-9 22H21z"/></svg><svg class="b b2" viewBox="0 0 100 100"><path d="M18 39h70l-9 22H9z"/></svg><svg class="b b3" viewBox="0 0 100 100"><path d="M6 78h70l-9 22H-3z"/></svg></span></div>
   <div class="announce" id="announce"></div>
   <header class="topbar" id="topbar">
     <div class="wrap topbar-in">
       <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
-      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="/brand/logo-dark.png" alt="THREADS Activewear & Lifestyle"></a>
+      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="/brand/logo-white.png" alt="THREADS Activewear & Lifestyle"></a>
       <nav class="nav" id="nav">
         <a href="/shop?gender=Women" data-link>Women</a>
         <a href="/shop?gender=Men" data-link>Men</a>
@@ -83,7 +90,7 @@
   <!-- Mobile menu -->
   <aside class="mmenu" id="mmenu" aria-hidden="true">
     <div class="mmenu-head">
-      <img src="/brand/logo-dark.png" alt="THREADS">
+      <img src="/brand/logo-white.png" alt="THREADS">
       <button class="icon-btn" id="closeMenu" aria-label="Close menu"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <a href="/shop?gender=Women" data-link>Women</a>
@@ -153,7 +160,9 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/js/fx.js"></script>
-  <script src="/js/store.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script src="/js/fx.js" defer></script>
+  <script src="/js/store.js" defer></script>
 </body>
 </html>
