@@ -134,8 +134,9 @@
       scene.fog = new THREE.Fog(0x050505, 11, 22);
 
       // the giant E behind the stand
-      const E = makeE(THREE, 0x202020);
+      const E = makeE(THREE, 0xecebe8);
       E.group.scale.setScalar(1.8);
+      E.bars.forEach(b => { b.material.fog = false; });
       E.group.position.set(0, 0.8, -7);
       E.group.rotation.set(0.05, -0.35, 0);
       scene.add(E.group);
@@ -218,7 +219,8 @@
           const y = floor + (m.userData.lift || 0) + Math.sin(t * 1.1 + i) * 0.05;
           m.position.set(x, y, z);
           m.rotation.set(0, (near > 0.95 ? ptr.x * 0.18 : 0) - Math.sin(a) * 0.5, 0);
-          m.material.opacity = 0.02 + near * near * near * 0.98;
+          // solid while it turns past the front; only the pieces at the back fade away
+          m.material.opacity = Math.min(1, Math.max(0, (near - 0.3) / 0.35));
           m.material.color.setScalar(0.35 + near * 0.65);
           m.renderOrder = Math.round(near * 100);
           m.userData.shadow.position.set(x, floor + 0.01, z);
@@ -255,7 +257,7 @@
       if (!fig.isConnected) return;
       const s = stage(THREE, host, { fov: 30, z: 11 });
       const { scene, camera } = s;
-      const E = makeE(THREE, 0x202020);
+      const E = makeE(THREE, 0xecebe8);
       E.group.scale.setScalar(1.5);
       E.group.position.set(0.4, 0.9, -5);
       E.group.rotation.set(0.05, -0.4, 0);
