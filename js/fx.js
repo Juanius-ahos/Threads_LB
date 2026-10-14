@@ -118,160 +118,158 @@
   }
 
   // ---------- the stand: the hero's 3D stage ----------
-  // items: [{ p, cut }]; onFront(i) is called when a new piece turns to the front. Returns { go(step) }.
+  // One brand at a time on a lit plinth, in front of the E as a dark sculpted backdrop with its green bar lit.
+  // The next logo spins in from the side while the last one spins out, like a turntable.
+  // Everything is sized from the visible frame, so it sits right on a phone, a laptop or a wide monitor.
+  // items: [{ logo, cut }]; onFront(i) is called when a new brand turns to the front. Returns { go(step) }.
   function stand(hero, items, onFront) {
     const host = hero.querySelector('.hero-gl');
     const n = items.length;
     let target = 0, front = 0, held = 0;
     const api = { go: d => { target = Math.round(target) + d; held = performance.now(); setFront(); } };
     const setFront = () => { const i = ((Math.round(target) % n) + n) % n; if (i !== front) { front = i; onFront(i); } };
-    if (reduce || !hasGL || !host) return api;
+    if (reduce || !hasGL || !host || !n) return api;
 
     three().then(THREE => {
       if (!hero.isConnected) return;
-      const s = stage(THREE, host, { fov: 32, z: 12 });
+      const CAM_Z = 12;
+      const s = stage(THREE, host, { fov: 30, z: CAM_Z });
       const { scene, camera } = s;
-      scene.fog = new THREE.Fog(0x050505, 11, 22);
+      const tanF = Math.tan(camera.fov * Math.PI / 360);
+      const halfAt = z => (CAM_Z - z) * tanF;              // half the visible height at depth z
 
-      // the giant E behind the stand
-      const E = makeE(THREE, 0xecebe8);
-      E.group.scale.setScalar(1.8);
-      E.bars.forEach(b => { b.material.fog = false; });
-      E.group.position.set(0, 0.8, -7);
-      E.group.rotation.set(0.05, -0.35, 0);
+      // light: a soft key from the upper left, a cool fill, the green from below and behind
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const key = new THREE.DirectionalLight(0xffffff, 2.6); key.position.set(-5, 7, 9); scene.add(key);
+      const fill = new THREE.DirectionalLight(0xbfd4ff, 0.6); fill.position.set(6, 2, 6); scene.add(fill);
+      const rim = new THREE.PointLight(GREEN, 90, 26); rim.position.set(2, -3, -2); scene.add(rim);
+
+      // the E, dark and sculpted, far behind the plinth
+      const E_Z = -6;
+      const E = makeE(THREE, 0x3b3c41);
+      E.bars.forEach(b => { if (b.material.color.getHex() !== GREEN) { b.material.metalness = 0.3; b.material.roughness = 0.5; } });
       scene.add(E.group);
-      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-      const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(4, 6, 8); scene.add(key);
-      const rim = new THREE.PointLight(GREEN, 60, 30); rim.position.set(-6, -2, 2); scene.add(rim);
 
-      // the ring of pieces
-      const ring = new THREE.Group();
-      scene.add(ring);
-      const R = 3.2, FLOOR = -2.35;
-      const loader = new THREE.TextureLoader();
-      const shadowTex = radial(THREE, '0,0,0', 0.75);
+      // the logos, extruded like the E
       const LOGOS = window.LOGO_SHAPES || {};
-      // a brand logo, extruded like the E: metal faces, a bevelled edge, the green light catching the sides
-      const logoMesh = key => {
-        const L = LOGOS[key]; if (!L) return null;
-        const shapes = L.parts.map(part => {
-          const sh = new THREE.Shape(part.outer.map(([x, y]) => new THREE.Vector2(x, y)));
-          part.holes.forEach(h => sh.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y)))));
-          return sh;
-        });
-        const geo = new THREE.ExtrudeGeometry(shapes, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 3, curveSegments: 6 });
-        geo.center();
-        const mat = new THREE.MeshStandardMaterial({ color: 0xf4f4f1, emissive: 0x2a2a2a, metalness: 0.12, roughness: 0.38, transparent: true });
-        const mesh = new THREE.Mesh(geo, mat);
-        const s = Math.min(1.35, 2.5 / L.aspect);              // fits a 2.5 x 1.35 box, tall marks and wide marks alike
-        mesh.scale.setScalar(s);
-        mesh.userData.lift = 0.75 + s / 2;                    // floats just above the green spot, centred
-        mesh.userData.logo = true;
-        return mesh;
-      };
-      const cards = items.map((it, i) => {
-        const lm = it.logo && logoMesh(it.logo);
-        if (lm) {
-          lm.userData.angle = (i / n) * Math.PI * 2;
-          const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.8), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
-          shadow.rotation.x = -Math.PI / 2;
-          ring.add(shadow); ring.add(lm);
-          lm.userData.shadow = shadow;
-          return lm;
+      const loader = new THREE.TextureLoader();
+      const logoMat = () => new THREE.MeshStandardMaterial({ color: 0xf6f6f3, emissive: 0x262626, metalness: 0.15, roughness: 0.32, transparent: true });
+      const piece = it => {
+        const L = it.logo && LOGOS[it.logo];
+        if (L) {
+          const shapes = L.parts.map(part => {
+            const sh = new THREE.Shape(part.outer.map(([x, y]) => new THREE.Vector2(x, y)));
+            part.holes.forEach(h => sh.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y)))));
+            return sh;
+          });
+          const geo = new THREE.ExtrudeGeometry(shapes, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.014, bevelSegments: 4, curveSegments: 8 });
+          geo.center();
+          const m = new THREE.Mesh(geo, logoMat());
+          m.userData.aspect = L.aspect;
+          return m;
         }
-        const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);   // stands on its bottom edge
+        // no outline for this brand: its flat logo on a card
         const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
-        const mesh = new THREE.Mesh(geo, mat);
-        loader.load(it.cut, t => {
-          t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-          mat.map = t; mat.needsUpdate = true;
-          const a = t.image.width / t.image.height;
-          const h = it.model ? (a > 0.9 ? 3.3 : 4.6) : a < 0.7 ? 4.0 : 2.3 / a;   // athletes tallest (a crouch less so), sets stand tall, shorts smaller
-          mesh.scale.set(h * a, h, 1);
-          mesh.userData.lift = it.model || a < 0.7 ? 0 : 0.9;  // shorts float at hip height
-        });
-        mesh.userData.angle = (i / n) * Math.PI * 2;
-        const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.9), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
-        shadow.rotation.x = -Math.PI / 2;
-        ring.add(shadow); ring.add(mesh);
-        mesh.userData.shadow = shadow;
-        return mesh;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+        m.userData.aspect = 1.6;
+        if (it.cut) loader.load(it.cut, t => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; m.userData.aspect = t.image.width / t.image.height; });
+        return m;
+      };
+      const shadowTex = radial(THREE, '0,0,0', 0.8);
+      const pieces = items.map(it => {
+        const m = piece(it);
+        const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+        sh.rotation.x = -Math.PI / 2;
+        scene.add(m); scene.add(sh);
+        m.userData.shadow = sh;
+        return m;
       });
 
-      // the green ring on the floor marks the front spot
-      const spot = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.2, 96), new THREE.MeshBasicMaterial({ color: GREEN, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
-      spot.rotation.x = -Math.PI / 2;
-      const glow = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: radial(THREE, '57,255,20', 0.35), transparent: true, depthWrite: false }));
-      glow.rotation.x = -Math.PI / 2;
-      ring.add(spot); ring.add(glow);
+      // the plinth: a dark disc with a green edge and a glow on the floor
+      const plinth = new THREE.Group();
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.07, 96), new THREE.MeshStandardMaterial({ color: 0x141416, metalness: 0.6, roughness: 0.35 }));
+      const edge = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 8, 160), new THREE.MeshBasicMaterial({ color: GREEN }));
+      edge.rotation.x = Math.PI / 2; edge.position.y = 0.036;
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: radial(THREE, '57,255,20', 0.32), transparent: true, depthWrite: false }));
+      glow.rotation.x = -Math.PI / 2; glow.position.y = -0.04;
+      plinth.add(glow, disc, edge);
+      scene.add(plinth);
 
-      // drag to spin
+      // drag to turn
       let drag = null;
       const down = e => { if (e.target.closest('a, button')) return; drag = { x: e.clientX, t: target }; held = performance.now(); };
-      const move = e => { if (!drag) return; target = drag.t - (e.clientX - drag.x) / (coarse ? 160 : 260); setFront(); };
+      const move = e => { if (!drag) return; target = drag.t - (e.clientX - drag.x) / (coarse ? 140 : 240); setFront(); };
       const up = () => { if (!drag) return; drag = null; target = Math.round(target); held = performance.now(); setFront(); };
       hero.addEventListener('pointerdown', down);
       addEventListener('pointermove', move, { passive: true });
       addEventListener('pointerup', up);
       own(() => { hero.removeEventListener('pointerdown', down); removeEventListener('pointermove', move); removeEventListener('pointerup', up); });
 
-      // the next piece every few seconds, unless someone is playing with it
-      const auto = setInterval(() => { if (!drag && performance.now() - held > 7000 && !document.hidden) { target = Math.round(target) + 1; setFront(); } }, 4200);
+      // the next brand every few seconds, unless someone is playing with it
+      const auto = setInterval(() => { if (!drag && performance.now() - held > 7000 && !document.hidden) { target = Math.round(target) + 1; setFront(); } }, 4600);
       own(() => clearInterval(auto));
 
-      // scrolling out: the camera pulls back and the E opens up
+      // scrolling out: the camera eases back and the E opens up
       let out = 0;
       const onScroll = () => { out = Math.min(1, Math.max(0, scrollY / (hero.offsetHeight || innerHeight))); };
       addEventListener('scroll', onScroll, { passive: true }); onScroll();
       own(() => removeEventListener('scroll', onScroll));
 
-      let turn = 0, sx = 0;
-      // the stand rises into place once (after the intro curtain, when there is one)
+      let turn = 0;
       const born = performance.now() + (root.classList.contains('th-intro') ? Math.max(0, 1700 - (performance.now() - t0)) : 150);
+      const ease = v => 1 - Math.pow(1 - Math.min(1, Math.max(0, v)), 3);
       s.onTick(t => {
-        turn += (target - turn) * (drag ? 0.25 : 0.075);
-        const wide = camera.aspect > 1.15;
-        // on wide screens the stand sits in the right half, clear of the headline
-        const halfW = (camera.position.z - R) * Math.tan(camera.fov * Math.PI / 360) * camera.aspect;
-        sx += ((wide ? halfW * 0.62 : 0) - sx) * 0.2;
-        // on phones the stand is smaller and sits under the headline
-        const floor = FLOOR;
-        const rise = Math.min(1, Math.max(0, (performance.now() - born) / 1700)), up = 1 - Math.pow(1 - rise, 3);
-        ring.position.set(sx, (wide ? 0 : -1.05) - (1 - up) * 3.2, 0);
-        ring.rotation.y = (1 - up) * -1.4;
-        ring.scale.setScalar(wide ? 1 : 0.55);
-        cards.forEach((m, i) => {
-          const a = m.userData.angle - (turn / n) * Math.PI * 2;
-          const z = Math.cos(a) * R, x = Math.sin(a) * R * (m.userData.logo ? 0.8 : 1.25);   // logos keep a tighter ring, clear of the headline
-          const near = (z / R + 1) / 2;                    // 1 in front, 0 at the back
-          const y = floor + (m.userData.lift || 0) + Math.sin(t * 1.1 + i) * 0.05;
-          m.position.set(x, y, z);
-          m.rotation.set(m.userData.logo ? Math.sin(t * 0.8 + i) * 0.06 : 0,
-            (near > 0.95 ? ptr.x * 0.18 + (m.userData.logo ? Math.sin(t * 0.7) * 0.35 : 0) : 0) - Math.sin(a) * 0.5, 0);
-          // solid while it turns past the front; only the pieces at the back fade away
-          m.material.opacity = Math.min(1, Math.max(0, (near - 0.3) / 0.35));
-          m.material.color.setScalar(0.35 + near * 0.65);
-          m.renderOrder = Math.round(near * 100);
-          m.userData.shadow.position.set(x, floor + 0.01, z);
-          m.userData.shadow.material.opacity = near;
-        });
-        spot.position.set(0, floor + 0.02, R);
-        glow.position.set(0, floor + 0.01, R);
-        spot.material.opacity = 0.55 + Math.sin(t * 2) * 0.25;
+        turn += (target - turn) * (drag ? 0.25 : 0.065);
+        const rise = ease((performance.now() - born) / 1400);
 
-        E.group.position.x += ((wide ? sx * 1.5 : 0) - E.group.position.x) * 0.2;
-        E.group.position.y += ((wide ? 0.8 : -2.5) - E.group.position.y) * 0.2;
-        E.group.scale.setScalar(E.group.scale.x + ((wide ? 1.8 : 0.95) - E.group.scale.x) * 0.2);
-        E.group.rotation.y = -0.35 + ptr.x * 0.12 + Math.sin(t * 0.3) * 0.05;
-        E.group.rotation.x = 0.05 + ptr.y * 0.06;
+        // the frame at the plinth's depth decides every size and position
+        const hH = halfAt(0), hW = hH * camera.aspect;
+        const wide = camera.aspect > 1.1;
+        const cx = wide ? hW * 0.47 : 0;                          // desktop: centre of the right half; phone: centre
+        const cy = wide ? -hH * 0.12 : -hH * 0.36;                // phone: under the headline, above the caption
+        const boxW = wide ? Math.min(hW * 0.6, hH * 1.45) : hW * 1.05;
+        const boxH = wide ? hH * 0.42 : hH * 0.22;
+        const floorY = cy - boxH * 0.62;
+
+        // plinth under the front logo
+        const pr = wide ? Math.min(boxW * 0.42, hH * 0.55) : boxW * 0.36;
+        plinth.position.set(cx, floorY - (1 - rise) * 2, 0.2);
+        plinth.scale.set(pr, 1, pr * 0.92);
+        edge.material.opacity = 1;
+
+        pieces.forEach((m, i) => {
+          let d = i - turn; d = ((d % n) + n) % n; if (d > n / 2) d -= n;   // -n/2 .. n/2, 0 is the front
+          const ad = Math.abs(d);
+          const fit = Math.min(boxW / m.userData.aspect, boxH);
+          const k = Math.max(0, 1 - ad);                                  // 1 at the front
+          const vis = Math.max(0, 1 - ad * 1.35) * rise;
+          m.visible = vis > 0.01;
+          m.scale.setScalar(fit * (0.55 + 0.45 * k));
+          m.position.set(cx + d * boxW * 0.75, cy + Math.sin(t * 1.2 + i) * hH * 0.012 - (1 - rise) * hH * 0.4, -ad * 2.4);
+          const spin = ad < 0.5 ? Math.sin(t * 0.55 + i) * 0.42 + ptr.x * 0.22 : 0;
+          m.rotation.set(ptr.y * 0.07 * k, -d * 1.4 + spin, 0);
+          m.material.opacity = vis;
+          m.renderOrder = Math.round(k * 100);
+          const sh = m.userData.shadow;
+          sh.position.set(m.position.x, floorY + 0.045 - (1 - rise) * 2, m.position.z + 0.2);
+          sh.scale.set(fit * m.userData.aspect * 0.9, fit * 0.5, 1);
+          sh.material.opacity = vis * 0.85;
+        });
+
+        // the E behind it all, sized from the frame at its own depth
+        const eH = halfAt(E_Z), eW = eH * camera.aspect, depth = (CAM_Z - E_Z) / CAM_Z;
+        const eScale = wide ? Math.min(eH * 1.1 / 3.4, eW * 0.85 / 4.8) : Math.min(eH * 0.4 / 3.4, eW * 1.3 / 4.8);
+        E.group.scale.setScalar(eScale * (0.85 + 0.15 * rise));
+        E.group.position.set(cx * depth + (wide ? eW * 0.02 : 0), (wide ? cy * depth + eH * 0.3 : cy * depth + eH * 0.13), E_Z);   // the logo stands in front of the E's lower half
+        E.group.rotation.set(0.06 + ptr.y * 0.05, -0.28 + ptr.x * 0.1 + Math.sin(t * 0.3) * 0.05, 0);
         E.bars.forEach((b, i) => {
           const [hx, hy] = b.userData.home;
-          b.position.set(hx + (i - 1) * -out * 2, hy * (1 + out * 0.6), Math.sin(t * 0.9 + i * 1.3) * 0.25);
+          b.position.set(hx + (i - 1) * -out * 1.6, hy * (1 + out * 0.5), Math.sin(t * 0.9 + i * 1.3) * 0.22);
         });
-        camera.position.x += (ptr.x * 0.5 - camera.position.x) * 0.04;
-        camera.position.y += (0.3 - ptr.y * 0.3 + out * 1.5 - camera.position.y) * 0.06;
-        camera.position.z = 12 + out * 4;
-        camera.lookAt(0, -0.6, 0);
+        rim.position.set(cx, floorY - 1, -1.5);
+
+        camera.position.set(ptr.x * 0.25, ptr.y * -0.15 + out * 1.2, CAM_Z + out * 3);
+        camera.lookAt(ptr.x * 0.25, out * 0.8, 0);
       });
       hero.classList.add('ready');
       own(() => s.dispose());
