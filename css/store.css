@@ -440,10 +440,13 @@ html.has-cursor .hero-gl, html.has-cursor .wall { cursor: none; }
 
 @media (max-width: 960px) {
   .f-cols { grid-template-columns: 1fr 1fr; }
-  .promises-list li { width: auto; left: var(--m) !important; right: var(--m) !important; text-align: left !important; }
+  .promises-list li { width: auto; left: var(--m) !important; right: var(--m) !important; text-align: center !important; }
   /* phones: one promise at a time, always in the lower half, under the small E */
-  .promises-list li:nth-child(n) { top: auto; bottom: 12%; }
-  .promises-kick { top: 30%; }
+  .promises-list li:nth-child(n) { top: 57%; bottom: auto; }
+  .promises-list b { font-size: clamp(2.2rem, 10vw, 3.2rem); margin-bottom: 12px; }
+  .promises-list span { display: block; max-width: 30ch; margin: 0 auto; }
+  .promises-kick { top: 32%; }
+  .promises-stage::before { background: radial-gradient(70% 45% at 50% 40%, rgba(57, 255, 20, .14), transparent 70%); }
   .promises-list li:not(.on) { opacity: 0 !important; }
   .brand-tile:nth-child(even) { margin-top: 40px; }
 }
