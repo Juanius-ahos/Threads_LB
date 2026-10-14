@@ -150,7 +150,35 @@
       const R = 3.2, FLOOR = -2.35;
       const loader = new THREE.TextureLoader();
       const shadowTex = radial(THREE, '0,0,0', 0.75);
+      const LOGOS = window.LOGO_SHAPES || {};
+      // a brand logo, extruded like the E: metal faces, a bevelled edge, the green light catching the sides
+      const logoMesh = key => {
+        const L = LOGOS[key]; if (!L) return null;
+        const shapes = L.parts.map(part => {
+          const sh = new THREE.Shape(part.outer.map(([x, y]) => new THREE.Vector2(x, y)));
+          part.holes.forEach(h => sh.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y)))));
+          return sh;
+        });
+        const geo = new THREE.ExtrudeGeometry(shapes, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 3, curveSegments: 6 });
+        geo.center();
+        const mat = new THREE.MeshStandardMaterial({ color: 0xf4f4f1, emissive: 0x2a2a2a, metalness: 0.12, roughness: 0.38, transparent: true });
+        const mesh = new THREE.Mesh(geo, mat);
+        const s = Math.min(1.35, 2.5 / L.aspect);              // fits a 2.5 x 1.35 box, tall marks and wide marks alike
+        mesh.scale.setScalar(s);
+        mesh.userData.lift = 0.75 + s / 2;                    // floats just above the green spot, centred
+        mesh.userData.logo = true;
+        return mesh;
+      };
       const cards = items.map((it, i) => {
+        const lm = it.logo && logoMesh(it.logo);
+        if (lm) {
+          lm.userData.angle = (i / n) * Math.PI * 2;
+          const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.8), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+          shadow.rotation.x = -Math.PI / 2;
+          ring.add(shadow); ring.add(lm);
+          lm.userData.shadow = shadow;
+          return lm;
+        }
         const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);   // stands on its bottom edge
         const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
@@ -214,11 +242,12 @@
         ring.scale.setScalar(wide ? 1 : 0.55);
         cards.forEach((m, i) => {
           const a = m.userData.angle - (turn / n) * Math.PI * 2;
-          const z = Math.cos(a) * R, x = Math.sin(a) * R * 1.25;
+          const z = Math.cos(a) * R, x = Math.sin(a) * R * (m.userData.logo ? 0.8 : 1.25);   // logos keep a tighter ring, clear of the headline
           const near = (z / R + 1) / 2;                    // 1 in front, 0 at the back
           const y = floor + (m.userData.lift || 0) + Math.sin(t * 1.1 + i) * 0.05;
           m.position.set(x, y, z);
-          m.rotation.set(0, (near > 0.95 ? ptr.x * 0.18 : 0) - Math.sin(a) * 0.5, 0);
+          m.rotation.set(m.userData.logo ? Math.sin(t * 0.8 + i) * 0.06 : 0,
+            (near > 0.95 ? ptr.x * 0.18 + (m.userData.logo ? Math.sin(t * 0.7) * 0.35 : 0) : 0) - Math.sin(a) * 0.5, 0);
           // solid while it turns past the front; only the pieces at the back fade away
           m.material.opacity = Math.min(1, Math.max(0, (near - 0.3) / 0.35));
           m.material.color.setScalar(0.35 + near * 0.65);
