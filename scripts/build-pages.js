@@ -17,14 +17,14 @@ fs.mkdirSync(out, { recursive: true });
 fs.cpSync(pub, out, { recursive: true, filter: src => !src.startsWith(path.join(pub, 'admin')) });
 
 // root-absolute asset paths become relative to <base href>
-const relative = text => text.replace(/(["'`(])\/(brand|products|campaign|instore|css|js|uploads)\//g, '$1$2/');
+const relative = text => text.replace(/(["'`(])\/(brand|products|campaign|instore|models|css|js|uploads)\//g, '$1$2/');
 
 const html = relative(fs.readFileSync(path.join(pub, 'index.html'), 'utf8'))
   .replace('<head>', `<head>\n  <base href="${base}/">\n  <meta name="th-base" content="${base}">\n  <meta name="th-static" content="1">`);
 fs.writeFileSync(path.join(out, 'index.html'), html);
 fs.writeFileSync(path.join(out, '404.html'), html);          // deep links like /shop open the app too
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
-for (const js of ['store.js', 'home-defaults.js']) fs.writeFileSync(path.join(out, 'js', js), relative(fs.readFileSync(path.join(pub, 'js', js), 'utf8')));
+for (const js of ['store.js', 'home-defaults.js', 'models.js']) fs.writeFileSync(path.join(out, 'js', js), relative(fs.readFileSync(path.join(pub, 'js', js), 'utf8')));
 
 // uploaded photos (from the admin) travel with the build
 const uploads = path.join(require('../src/db').DATA_DIR, 'uploads');

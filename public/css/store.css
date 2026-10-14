@@ -151,6 +151,8 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 .hero.ready .hero-flat { opacity: 0; }
 .hero-copy { position: absolute; left: var(--m); top: 50%; transform: translateY(-50%); width: min(620px, 46%); pointer-events: none; }
 .hero-copy a, .hero-copy button { pointer-events: auto; }
+/* a soft shade behind the words so the turning stand never fights the headline */
+.hero-copy::before { content: ""; position: absolute; z-index: -1; inset: -30% -35% -30% -60%; background: radial-gradient(closest-side, rgba(5, 5, 5, .82), rgba(5, 5, 5, .55) 60%, transparent); pointer-events: none; } /* taste-skill-ignore: scrim under text */
 .hero h1 { font: italic 900 clamp(3.6rem, 1.4rem + 7.4vw, 9.5rem)/.86 var(--display); font-stretch: 100%; letter-spacing: -0.02em; text-transform: uppercase; margin: 0 0 22px; }
 .hero h1 em { display: block; }
 .hero-sub { font-size: var(--step-lead); line-height: 1.4; color: #d6d6d6; max-width: 36ch; margin: 0 0 28px; }
@@ -439,9 +441,9 @@ html.has-cursor .hero-gl, html.has-cursor .wall { cursor: none; }
 @media (max-width: 960px) {
   .f-cols { grid-template-columns: 1fr 1fr; }
   .promises-list li { width: auto; left: var(--m) !important; right: var(--m) !important; text-align: left !important; }
-  .promises-list li:nth-child(1) { top: 10%; }
-  .promises-list li:nth-child(2) { top: auto; bottom: 30%; }
-  .promises-list li:nth-child(3) { bottom: 8%; }
+  /* phones: one promise at a time, always in the lower half, under the small E */
+  .promises-list li:nth-child(n) { top: auto; bottom: 12%; }
+  .promises-kick { top: 30%; }
   .promises-list li:not(.on) { opacity: 0 !important; }
   .brand-tile:nth-child(even) { margin-top: 40px; }
 }
@@ -515,6 +517,11 @@ html.th-intro .intro.done { animation: curtain .8s cubic-bezier(.7, 0, .2, 1) fo
   .rail-sec, .sport-sec { padding-top: 80px; }
   .banner { height: 78svh; margin: 60px 0; }
   .banner::after { background: linear-gradient(transparent 30%, rgba(0, 0, 0, .8)); }
+  /* phones: every banner reads from the left, nothing runs into the edge */
+  .banner-r { justify-content: flex-start; }
+  .banner-r .banner-copy { text-align: left; }
+  .banner-r .banner-copy p { margin-left: 0; }
+  .banner-r .cta-row { justify-content: flex-start; }
   .brand-tile-tag { font-size: 1.15rem; }
   .brand-tile-in { left: 14px; right: 14px; bottom: 14px; }
   .brand-tile-logo { height: 24px; }
