@@ -526,7 +526,7 @@
       // where each bar travels to when its promise is told (x, y, rotation)
       const wide = () => s.camera.aspect > 1.1;
       // wide screens: the bars spread down the right half, the promises read down the left
-      const AWAY = () => wide() ? [[0, 2.5, -0.25], [0, 0, 0.25], [0, -2.5, -0.25]] : [[0.3, 1.5, -0.2], [0, 0, 0.2], [-0.3, -1.5, -0.2]];
+      const AWAY = () => wide() ? [[0, 2.5, -0.25], [0, 0, 0.25], [0, -2.5, -0.25]] : [[0.25, 1.25, -0.2], [0, 0, 0.2], [-0.25, -1.25, -0.2]];
       let sp = 0;
       s.onTick(t => {
         sp += (p - sp) * 0.08;
@@ -541,8 +541,8 @@
           b.rotation.set(Math.sin(t * 0.7 + i) * 0.08, ar * k + Math.sin(t * 0.5 + i) * 0.1, ar * k * 0.4);
         });
         E.group.position.x += ((wide() ? 2.8 * open : 0) - E.group.position.x) * 0.1;
-        E.group.position.y += ((wide() ? 0 : 2.1) - E.group.position.y) * 0.1;
-        E.group.scale.setScalar(E.group.scale.x + ((wide() ? 1 : 0.6) - E.group.scale.x) * 0.1);
+        E.group.position.y += ((wide() ? 0 : 1.15) - E.group.position.y) * 0.1;   // phones: upper middle, the promise reads right under it
+        E.group.scale.setScalar(E.group.scale.x + ((wide() ? 1 : 0.5) - E.group.scale.x) * 0.1);
         E.group.rotation.y = ptr.x * 0.25 + Math.sin(t * 0.4) * 0.12;
         E.group.rotation.x = ptr.y * 0.12;
       });
