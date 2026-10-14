@@ -7,32 +7,38 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>THREADS — Activewear & Lifestyle</title>
-  <meta name="description" content="THREADS Activewear & Lifestyle, Lebanon. Nike, Adidas, On and The North Face. Cash on delivery all over Lebanon.">
-  <meta name="theme-color" content="#c9cacc">
+  <meta name="description" content="Original Nike, adidas, On and The North Face. Cash on delivery all over Lebanon, and a store in Wadi Chahrour where you can try it on.">
+  <meta name="theme-color" content="#000000">
   <meta property="og:title" content="THREADS — Activewear & Lifestyle">
   <meta property="og:description" content="Nike, Adidas, On & The North Face. Cash on delivery all over Lebanon.">
-  <meta property="og:image" content="brand/logo-circle.jpg">
+  <meta property="og:image" content="brand/hero.jpg">
   <link rel="icon" href="brand/favicon.png">
   <link rel="apple-touch-icon" href="brand/logo-circle.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://images.unsplash.com">
-  <link rel="preconnect" href="https://thumb.wikimedia.org">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
-  <script>document.documentElement.classList.add('js')</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wdth,wght@0,50..125,100..900;1,50..125,100..900&display=swap" rel="stylesheet">
+  <script>document.documentElement.classList.add('js');try{if(!sessionStorage.getItem('th_intro')&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('th-intro')}catch(e){}</script>
   <link rel="stylesheet" href="css/store.css">
 </head>
 <body>
+  <!-- first visit in a session: the three bars lock into the E, then the curtain lifts -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-word"><span class="iw"><span>THR</span></span><span class="intro-e"><svg class="b b1" viewBox="0 0 100 100"><path d="M30 0h70l-9 22H21z"/></svg><svg class="b b2" viewBox="0 0 100 100"><path d="M18 39h70l-9 22H9z"/></svg><svg class="b b3" viewBox="0 0 100 100"><path d="M6 78h70l-9 22H-3z"/></svg></span><span class="iw"><span>ADS</span></span></div>
+  </div>
+  <!-- page change -->
+  <div class="wipe" id="wipe" aria-hidden="true" hidden><span class="wipe-e"><svg class="b b1" viewBox="0 0 100 100"><path d="M30 0h70l-9 22H21z"/></svg><svg class="b b2" viewBox="0 0 100 100"><path d="M18 39h70l-9 22H9z"/></svg><svg class="b b3" viewBox="0 0 100 100"><path d="M6 78h70l-9 22H-3z"/></svg></span></div>
   <div class="announce" id="announce"></div>
   <header class="topbar" id="topbar">
     <div class="wrap topbar-in">
       <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
-      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="brand/logo-dark.png" alt="THREADS Activewear & Lifestyle"></a>
+      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="brand/logo-white.png" alt="THREADS Activewear & Lifestyle"></a>
       <nav class="nav" id="nav">
         <a href="/shop?gender=Women" data-link>Women</a>
         <a href="/shop?gender=Men" data-link>Men</a>
+        <div class="dd"><button type="button" aria-haspopup="true">Categories</button><div class="dd-panel dd-list" id="ddCats"></div></div>
         <div class="dd"><button type="button" aria-haspopup="true">Brands</button><div class="dd-panel" id="ddBrands"></div></div>
         <a href="/shop" data-link>Shop all</a>
         <a href="/shop?sale=1" data-link class="nav-sale">Sale</a>
@@ -53,21 +59,42 @@
 
   <footer class="footer">
     <div class="f-top">
-      <div class="f-invite rise">
+      <div class="f-invite">
         <h2>Not sure of your size?</h2>
-        <a class="btn btn-green" id="footWaBtn" target="_blank" rel="noopener">Message us on WhatsApp</a>
+        <p class="f-sub">Message us on WhatsApp, or come try it on at the store.</p>
+        <div class="cta-row"><a class="btn btn-green" id="footWaBtn" target="_blank" rel="noopener">Message us on WhatsApp</a><a class="btn btn-ghost-d" id="footMapBtn" target="_blank" rel="noopener">Get directions</a></div>
       </div>
-      <nav class="f-links rise" aria-label="Footer">
-        <a id="footIg" target="_blank" rel="noopener">Instagram</a>
-        <a id="footWa" target="_blank" rel="noopener">WhatsApp</a>
-        <a href="/shop" data-link>Shop all</a>
-        <a href="#" id="footSize">Size guide</a>
-        <a href="/privacy" data-link>Privacy</a>
-      </nav>
+      <div class="f-cols">
+        <nav class="f-col" aria-label="Shop">
+          <h3>Shop</h3>
+          <a href="/shop?gender=Women" data-link>Women</a>
+          <a href="/shop?gender=Men" data-link>Men</a>
+          <a href="/shop?sale=1" data-link>Sale</a>
+          <span id="fCats"></span>
+          <a href="/shop" data-link>Shop all</a>
+        </nav>
+        <nav class="f-col" aria-label="Brands"><h3>Brands</h3><span id="fBrands"></span></nav>
+        <nav class="f-col" aria-label="Help">
+          <h3>Help</h3>
+          <a href="#" id="footSize">Size guide</a>
+          <a id="footWa" target="_blank" rel="noopener">WhatsApp us</a>
+          <a href="/checkout" data-link>Checkout</a>
+          <a href="/privacy" data-link>Privacy</a>
+        </nav>
+        <div class="f-col">
+          <h3>The store</h3>
+          <address id="fAddress"></address>
+          <a id="footMap" target="_blank" rel="noopener">Find the store</a>
+          <a id="footIg" target="_blank" rel="noopener">Instagram</a>
+        </div>
+      </div>
     </div>
+    <ul class="f-promise" aria-label="What you get">
+      <li><i></i>100% original</li><li><i></i>Cash on delivery</li><li><i></i>Delivery all over Lebanon</li><li><i></i>Easy size swaps</li>
+    </ul>
     <div class="f-legal">
-      <span>© <span id="year"></span> THREADS Activewear &amp; Lifestyle, Lebanon. Cash on delivery across the country.</span>
-      <span id="fCredits">Photographs of Lebanon via Wikimedia Commons: Beirut Corniche by Vyacheslav Argenberg (CC BY 4.0); Beirut Corniche at Night, by Wusel007 (CC BY-SA 3.0); Zig-zag Lebanese mountain road and Aley houses and hillside by Peripitus (CC BY-SA 3.0).</span>
+      <span>© <span id="year"></span> THREADS Activewear &amp; Lifestyle, Lebanon.</span>
+      <span class="f-credit">Website by <a href="https://www.ahos.xyz" target="_blank" rel="noopener">www.ahos.xyz</a></span>
     </div>
     <div class="f-word" aria-hidden="true"><span>THR</span><span class="f-e" data-emblem><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 0h70l-9 22H21z" fill="currentColor"/><path class="mid" d="M18 39h70l-9 22H9z"/><path d="M6 78h70l-9 22H-3z" fill="currentColor"/></svg></span><span>ADS</span></div>
   </footer>
@@ -79,26 +106,27 @@
       <h3 id="drawerTitle">Your bag</h3>
       <button class="icon-btn dark" id="closeDrawer" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-body" id="drawerBody" data-lenis-prevent></div>
     <div class="drawer-foot" id="drawerFoot"></div>
   </aside>
 
   <!-- Mobile menu -->
-  <aside class="mmenu" id="mmenu" aria-hidden="true">
+  <aside class="mmenu" id="mmenu" aria-hidden="true" data-lenis-prevent>
     <div class="mmenu-head">
-      <img src="brand/logo-dark.png" alt="THREADS">
+      <img src="brand/logo-white.png" alt="THREADS">
       <button class="icon-btn" id="closeMenu" aria-label="Close menu"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <a href="/shop?gender=Women" data-link>Women</a>
     <a href="/shop?gender=Men" data-link>Men</a>
     <a href="/shop" data-link>Shop all</a>
     <a href="/shop?sale=1" data-link>Sale</a>
+    <div class="mmenu-cats" id="mmenuCats"></div>
     <div class="mmenu-brands" id="mmenuBrands"></div>
     <div class="mmenu-foot">Need help? <a id="mmWa" target="_blank" rel="noopener">WhatsApp us</a></div>
   </aside>
 
   <!-- Search -->
-  <div class="search-ov" id="searchOv" hidden>
+  <div class="search-ov" id="searchOv" hidden data-lenis-prevent>
     <div class="search-box">
       <div class="wrap">
         <form class="search-row" id="searchForm">
@@ -113,7 +141,7 @@
 
   <!-- Welcome / sign-up popup -->
   <div class="modal" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle">
-    <div class="modal-card wcard">
+    <div class="modal-card wcard" data-lenis-prevent>
       <div class="modal-top">
         <img src="brand/logo-white.png" alt="THREADS Activewear &amp; Lifestyle" class="wlogo">
         <span class="pill">ACTIVEWEAR &amp; LIFESTYLE</span>
@@ -147,7 +175,7 @@
 
   <!-- Size guide -->
   <div class="modal" id="sizeGuide" hidden>
-    <div class="modal-card sg-card">
+    <div class="modal-card sg-card" data-lenis-prevent>
       <div class="mt"><h2>Size guide</h2><button class="icon-btn dark" id="sgClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="seg" id="sgSeg"><button class="on" data-t="w">Women</button><button data-t="m">Men</button></div>
       <div id="sgTable"></div>
@@ -155,8 +183,13 @@
     </div>
   </div>
 
+  <div class="grain" aria-hidden="true"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="js/fx.js"></script>
-  <script src="js/store.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js" defer></script>
+  <script src="js/home-defaults.js" defer></script>
+  <script src="js/fx.js" defer></script>
+  <script src="js/store.js" defer></script>
 </body>
 </html>
