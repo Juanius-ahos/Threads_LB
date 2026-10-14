@@ -287,6 +287,7 @@
 
     app.innerHTML = `
       <section class="hero" id="hero">
+        <div class="stand-word" id="standWord" aria-hidden="true"></div>
         <div class="hero-gl" aria-hidden="true"></div>
         ${stage.length ? `<img class="hero-flat" src="${stage[0].cut}" alt="" aria-hidden="true">` : ''}
         <div class="hero-copy">
@@ -441,6 +442,8 @@
         const n = PRODUCTS.filter(x => x.brand.toLowerCase() === brand.toLowerCase()).length;
         $('#standBrand').textContent = 'Original';
         name.textContent = `Shop ${BRAND_NAME[brand.toLowerCase()] || brand}`;
+        const word = $('#standWord');
+        if (word) { word.textContent = BRAND_NAME[brand.toLowerCase()] || brand; word.classList.remove('swap'); void word.offsetWidth; word.classList.add('swap'); }
         name.setAttribute('href', `/shop?brand=${encodeURIComponent(brand)}`);
         $('#standPrice').textContent = n ? `${n} piece${n === 1 ? '' : 's'} in stock` : 'New pieces coming soon';
         return;
