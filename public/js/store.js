@@ -216,6 +216,7 @@
   const OLD_DEFAULTS = /images\.unsplash\.com\/photo-(1574680088814|1552674605|1608748180154|1726195222023|1511746315387|1718248028293|1618329918461|1556705634|1784924176852|1541534741688)/;
   const own = (url, fallback) => url && !OLD_DEFAULTS.test(url) ? src(url, 1800) : fallback;
   const BRAND_ART = { nike: 'nike-vest', adidas: 'adidas-studio', on: 'on-jump', 'the north face': 'tnf-orange' };
+  const BRAND_BANNER = { nike: 'nike-sprint', adidas: 'adidas-gym', on: 'on-runner', 'the north face': 'tnf-shell' };
   const BRAND_NAME = { nike: 'Nike', adidas: 'adidas', on: 'On', 'the north face': 'The North Face' };
   const SPORTS = [
     { name: 'Running', img: 'nike-run-group', link: '/shop?category=Shorts' },
@@ -496,9 +497,12 @@
     document.title = `${p.brand} ${p.name} — ${p.color} — THREADS`;
     const sibs = groupsOf(siblings(p))[0];
     let sel = p.sizes.length === 1 && p.sizes[0].stock > 0 ? p.sizes[0].size : null, qty = 1;
-    const relatedGroups = groupsOf(PRODUCTS.filter(x => gkey(x) !== gkey(p) && (x.category === p.category || x.brand === p.brand || x.gender === p.gender))).slice(0, 4);
+    const relatedGroups = groupsOf(PRODUCTS.filter(x => gkey(x) !== gkey(p) && (x.category === p.category || x.brand === p.brand || x.gender === p.gender))).slice(0, 8);
     const waText = encodeURIComponent(`Hi THREADS! I'm interested in the ${p.brand} ${p.name} (${p.color}, ${p.sku}). ${location.href}`);
     const imgs = p.images.length ? p.images : [null];
+    const cut = CUTS[p.sku];
+    const bkey = p.brand.toLowerCase(), bname = BRAND_NAME[bkey] || p.brand;
+    const inBrand = PRODUCTS.filter(x => x.brand.toLowerCase() === bkey).length;
     const off = p.sale_price != null ? Math.round((1 - p.sale_price / p.price) * 100) : 0;
 
     app.innerHTML = `
@@ -506,12 +510,12 @@
         <div class="crumbs"><a href="/" data-link>Home</a> / <a href="/shop?gender=${p.gender === 'Unisex' ? '' : p.gender}" data-link>${p.gender === 'Unisex' ? 'Shop' : p.gender}</a>${p.category ? ` / <a href="/shop?category=${encodeURIComponent(p.category)}" data-link>${esc(p.category)}</a>` : ''} / <span style="color:var(--ink)">${esc(p.name)}</span></div>
         <div class="pdp">
           <div>
-            <div class="gal" id="gal">${imgs.map((u, i) => `<figure data-i="${i}">${u ? `<img src="${esc(src(u, 1200))}" alt="${esc(p.name)} ${esc(p.color)} — photo ${i + 1}" ${i ? 'loading="lazy"' : ''}>` : media(p)}</figure>`).join('')}</div>
-            ${imgs.length > 1 ? `<div class="gal-dots" id="galDots">${imgs.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
+            <div class="gal" id="gal">${cut ? `<figure class="g3d" aria-label="${esc(`${p.brand} ${p.name}`)} in 3D"><div class="g3d-gl"></div><img class="g3d-flat" src="${cut}" alt=""><span class="g3d-tag"><i></i>3D view</span></figure>` : ''}${imgs.map((u, i) => `<figure data-i="${i}">${u ? `<img src="${esc(src(u, 1200))}" alt="${esc(p.name)} ${esc(p.color)} — photo ${i + 1}" ${i ? 'loading="lazy"' : ''}>` : media(p)}</figure>`).join('')}</div>
+            ${imgs.length + (cut ? 1 : 0) > 1 ? `<div class="gal-dots" id="galDots">${[...(cut ? [0] : []), ...imgs].map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
           </div>
           <div class="pdp-info">
             <a class="card-brand" href="/shop?brand=${encodeURIComponent(p.brand)}" data-link><img src="${brandLogo(p.brand)}" alt="">${esc(p.brand)}</a>
-            <h1 class="split-me">${esc(p.name)}</h1>
+            <h1 class="pdp-title">${esc(p.name)}</h1>
             <div style="display:flex;gap:12px;align-items:center">${priceHtml(p)}${off ? `<span class="save-pill">SAVE ${off}%</span>` : ''}</div>
             ${sibs.length > 1 ? `<div class="pdp-block"><div class="label-row"><span>Colour</span><span>${esc(p.color)}</span></div>
               <div class="colors">${sibs.map(v => `<a class="color-opt ${v.id === p.id ? 'on' : ''}" href="/p/${esc(v.slug)}" data-swap title="${esc(v.color)}" aria-label="${esc(v.color)}">${v.images[0] ? `<img src="${esc(src(v.images[0], 200))}" alt="">` : `<span style="display:block;width:100%;height:100%;background:${esc(hexOf(v))}"></span>`}</a>`).join('')}</div></div>`
@@ -535,8 +539,20 @@
             <details class="acc"><summary>Size exchanges</summary><div>Not the right fit? Message us on WhatsApp within a few days of delivery and we'll arrange a size swap (item unworn, tags on).</div></details>
           </div>
         </div>
-        ${relatedGroups.length ? `<section class="section on-light" style="padding-top:60px"><div class="sec-head"><div><h2 class="h2">You may also like</h2></div></div><div class="grid">${relatedGroups.map(g => card(g)).join('')}</div></section>` : ''}
-      </div>`;
+      </div>
+      ${relatedGroups.length ? `<section class="rail-sec">
+        <div class="sec-row"><h2 class="h-sec">You may also like</h2><a class="link" href="/shop" data-link>View all</a></div>
+        <div class="rail" id="rail">${relatedGroups.map(g => card(g)).join('')}</div>
+        <div class="rail-btns"><button type="button" class="icon-btn" data-rail="-1" aria-label="Scroll left"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" class="icon-btn" data-rail="1" aria-label="Scroll right"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
+      </section>` : ''}
+      ${BRAND_BANNER[bkey] ? `<section class="banner">
+        ${pic(BRAND_BANNER[bkey], '', '100vw')}
+        <div class="banner-copy">
+          <h2>More <em>${esc(bname)}</em></h2>
+          <p>${inBrand} ${inBrand === 1 ? 'piece' : 'pieces'} from ${esc(bname)} in stock now. Original, delivered anywhere in Lebanon, paid in cash at your door.</p>
+          <div class="cta-row"><a class="btn btn-green" href="/shop?brand=${encodeURIComponent(p.brand)}" data-link>Shop ${esc(bname)}</a></div>
+        </div>
+      </section>` : ''}`;
 
     // colour swap keeps scroll position
     $$('[data-swap]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const y = scrollY; history.replaceState({}, '', a.getAttribute('href')); render(); scrollTo(0, y); }, true));
@@ -546,7 +562,14 @@
       const dots = $$('#galDots i');
       gal.addEventListener('scroll', () => { const i = Math.round(gal.scrollLeft / gal.clientWidth); dots.forEach((d, j) => d.classList.toggle('on', i === j)); }, { passive: true });
     }
-    $$('#gal figure').forEach(f => f.onclick = () => { if (matchMedia('(min-width: 961px)').matches && p.images.length) lightbox(p.images, +f.dataset.i); });
+    $$('#gal figure[data-i]').forEach(f => f.onclick = () => { if (matchMedia('(min-width: 961px)').matches && p.images.length) lightbox(p.images, +f.dataset.i); });
+    if (matchMedia('(hover: hover) and (min-width: 961px)').matches) $$('#gal figure[data-i]').forEach(f => {
+      const img = $('img', f); if (!img) return;
+      f.addEventListener('mouseenter', () => f.classList.add('zoom'));
+      f.addEventListener('mouseleave', () => f.classList.remove('zoom'));
+      f.addEventListener('mousemove', e => { const r = f.getBoundingClientRect(); img.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; });
+    });
+    wireRail();
     // sizes
     const stockOf = s => (p.sizes.find(x => x.size === s) || {}).stock || 0;
     $$('.size').forEach(b => b.onclick = () => {
@@ -569,7 +592,11 @@
           return;
         }
         const size = sel, n = qty;
-        gate(() => addToCart(p, size, n, true));
+        gate(() => {
+          const from = $('#gal figure[data-i] img') || $('#gal img');
+          if (window.FX && from) FX.fly(from, $('#bagBtn')).then(() => addToCart(p, size, n, true));
+          else addToCart(p, size, n, true);
+        });
       };
     }
   }

@@ -37,14 +37,20 @@
     const w = document.getElementById('wipe');
     if (reduce || !w || !w.animate) return swap();
     const ease = 'cubic-bezier(.7,0,.2,1)';
+    let swapped = false;
+    const doSwap = () => { if (!swapped) { swapped = true; swap(); } };
+    const done = () => { w.hidden = true; w.getAnimations().forEach(a => a.cancel()); };
+    // never hold the page behind the panel: swap and clear on a timer even if the animation stalls
+    const safety = setTimeout(() => { doSwap(); done(); }, 1400);
     w.hidden = false;
     w.animate([{ transform: 'scaleY(0)', transformOrigin: '50% 100%' }, { transform: 'scaleY(1)', transformOrigin: '50% 100%' }], { duration: 340, easing: ease, fill: 'forwards' })
       .finished.then(() => {
-        swap();
+        if (swapped) return;
+        doSwap();
         return w.animate([{ transform: 'scaleY(1)', transformOrigin: '50% 0%' }, { transform: 'scaleY(0)', transformOrigin: '50% 0%' }], { duration: 460, delay: 90, easing: ease, fill: 'forwards' }).finished;
       })
-      .then(() => { w.hidden = true; w.getAnimations().forEach(a => a.cancel()); })
-      .catch(() => { w.hidden = true; });
+      .then(() => { clearTimeout(safety); done(); })
+      .catch(() => { clearTimeout(safety); doSwap(); done(); });
   }
 
   // ---------- a render loop that sleeps while its canvas is off screen ----------
@@ -236,6 +242,112 @@
     return api;
   }
 
+  // ---------- one piece in 3D, for the product page ----------
+  // The cutout floats on the green spot in front of the E and leans toward the pointer.
+  function showcase(fig, cut) {
+    const host = fig.querySelector('.g3d-gl');
+    if (reduce || !hasGL || !host) return;
+    three().then(THREE => {
+      if (!fig.isConnected) return;
+      const s = stage(THREE, host, { fov: 30, z: 11 });
+      const { scene, camera } = s;
+      const E = makeE(THREE, 0x202020);
+      E.group.scale.setScalar(1.5);
+      E.group.position.set(0.4, 0.9, -5);
+      E.group.rotation.set(0.05, -0.4, 0);
+      scene.add(E.group);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+      const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(4, 6, 8); scene.add(key);
+      const rim = new THREE.PointLight(GREEN, 50, 30); rim.position.set(-6, -2, 2); scene.add(rim);
+
+      const FLOOR = -2.4;
+      const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+      const piece = new THREE.Mesh(geo, mat);
+      let lift = 0;
+      new THREE.TextureLoader().load(cut, t => {
+        t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+        mat.map = t; mat.needsUpdate = true;
+        const a = t.image.width / t.image.height;
+        const h = a < 0.7 ? 4.6 : 3.2 / a;
+        piece.scale.set(h * a, h, 1);
+        lift = a < 0.7 ? 0 : 1.1;
+      });
+      scene.add(piece);
+      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3, 1), new THREE.MeshBasicMaterial({ map: radial(THREE, '0,0,0', 0.8), transparent: true, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2; shadow.position.set(0, FLOOR + 0.01, 0);
+      const spot = new THREE.Mesh(new THREE.RingGeometry(1.35, 1.4, 96), new THREE.MeshBasicMaterial({ color: GREEN, transparent: true, side: THREE.DoubleSide }));
+      spot.rotation.x = -Math.PI / 2; spot.position.set(0, FLOOR + 0.02, 0);
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: radial(THREE, '57,255,20', 0.35), transparent: true, depthWrite: false }));
+      glow.rotation.x = -Math.PI / 2; glow.position.set(0, FLOOR + 0.01, 0);
+      scene.add(shadow, spot, glow);
+
+      // lean toward the pointer while it is over the tile; sway gently otherwise
+      const local = { x: 0, y: 0, on: false };
+      const move = e => { const r = fig.getBoundingClientRect(); local.x = (e.clientX - r.left) / r.width * 2 - 1; local.y = (e.clientY - r.top) / r.height * 2 - 1; local.on = true; };
+      const leave = () => { local.on = false; };
+      fig.addEventListener('pointermove', move); fig.addEventListener('pointerleave', leave);
+      own(() => { fig.removeEventListener('pointermove', move); fig.removeEventListener('pointerleave', leave); });
+
+      let ry = 0, rx = 0;
+      s.onTick(t => {
+        const tx = local.on ? local.x * 0.45 : Math.sin(t * 0.7) * 0.22;
+        const ty = local.on ? local.y * 0.12 : 0;
+        ry += (tx - ry) * 0.07; rx += (ty - rx) * 0.07;
+        const bob = Math.sin(t * 1.2) * 0.08;
+        piece.position.set(0, FLOOR + lift + bob + 0.05, 0);
+        piece.rotation.set(rx, ry, 0);
+        shadow.material.opacity = 0.9 - bob * 2;
+        spot.material.opacity = 0.55 + Math.sin(t * 2) * 0.25;
+        E.group.rotation.y = -0.4 + ry * 0.3;
+        E.bars.forEach((b, i) => { b.position.z = Math.sin(t * 0.9 + i * 1.3) * 0.25; });
+        camera.position.x += (ry * -1.2 - camera.position.x) * 0.05;
+        camera.lookAt(0, -0.4, 0);
+      });
+      fig.classList.add('ready');
+      own(() => s.dispose());
+    }).catch(() => {});
+  }
+
+  // ---------- add to bag: the photo flies into the bag ----------
+  function fly(fromImg, toEl) {
+    if (reduce || !fromImg || !toEl || !fromImg.animate) return Promise.resolve();
+    const a = fromImg.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    const size = Math.min(a.width, 220);
+    const ghost = fromImg.cloneNode();
+    ghost.removeAttribute('loading'); ghost.removeAttribute('srcset');
+    ghost.className = 'fly';
+    Object.assign(ghost.style, { left: `${a.left + a.width / 2 - size / 2}px`, top: `${a.top + Math.min(a.height, innerHeight) / 2 - size * 0.625}px`, width: `${size}px`, height: `${size * 1.25}px` });
+    document.body.appendChild(ghost);
+    const gx = b.left + b.width / 2 - (a.left + a.width / 2), gy = b.top + b.height / 2 - (parseFloat(ghost.style.top) + size * 0.625);
+    const flight = ghost.animate([
+      { transform: 'translate(0, 0) scale(1) rotate(0)', opacity: 1 },
+      { transform: `translate(${gx * 0.55}px, ${gy * 0.35 - 120}px) scale(.55) rotate(-8deg)`, opacity: 1, offset: 0.55 },
+      { transform: `translate(${gx}px, ${gy}px) scale(.08) rotate(-14deg)`, opacity: 0.6 },
+    ], { duration: 720, easing: 'cubic-bezier(.5, 0, .3, 1)' });
+    // the bag opens on time even if the browser holds the animation back
+    return Promise.race([flight.finished.catch(() => {}), new Promise(r => setTimeout(r, 900))])
+      .then(() => { ghost.remove(); toEl.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' }); });
+  }
+
+  // ---------- the product page ----------
+  function product(app) {
+    const g3d = app.querySelector('.g3d');
+    if (g3d) showcase(g3d, g3d.querySelector('.g3d-flat').getAttribute('src'));
+    if (!GSAP() || reduce) return;
+    const tws = [];
+    own(() => tws.forEach(t => { if (t.scrollTrigger) t.scrollTrigger.kill(); t.kill(); }));
+    const info = app.querySelector('.pdp-info');
+    if (info) {
+      const tl = gsap.timeline({ delay: 0.15, defaults: { ease: 'expo.out' } });
+      tws.push(tl);
+      tl.from(splitWords(info.querySelector('.pdp-title')), { yPercent: 110, skewY: 6, duration: 1, stagger: 0.06 })
+        .from([...info.children].filter(c => !c.classList.contains('pdp-title')), { y: 24, opacity: 0, duration: 0.8, stagger: 0.05 }, 0.15)
+        .from(app.querySelectorAll('.gal figure'), { clipPath: 'inset(0 0 100% 0)', duration: 1.1, ease: 'expo.inOut', stagger: 0.08 }, 0);
+    }
+    choreograph(app);
+  }
+
   // ---------- the E in the footer ----------
   function emblem(host) {
     if (!host || reduce || !hasGL || host.dataset.live) return;
@@ -368,7 +480,10 @@
 
   // ---------- route hooks, called by store.js ----------
   function leave() { disposers.forEach(fn => { try { fn(); } catch {} }); disposers = []; }
-  function enter(path, app) { if (path === '/') home(app); }
+  function enter(path, app) {
+    if (path === '/') home(app);
+    else if (path.startsWith('/p/')) product(app);
+  }
 
   // the footer is on every page: its E wakes when the footer comes near
   const fE = document.querySelector('.f-e[data-emblem]');
@@ -377,5 +492,5 @@
     ob.observe(fE);
   }
 
-  window.FX = { introDone, transition, leave, enter, stand };
+  window.FX = { introDone, transition, leave, enter, stand, fly };
 })();
