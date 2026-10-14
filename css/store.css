@@ -180,7 +180,11 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 .stand-hint { position: absolute; right: 0; bottom: calc(100% + 14px); margin: 0; font-size: var(--step-small); color: #8a8a8a; white-space: nowrap; }
 .hero:not(.ready) .stand-hint { display: none; }
 /* the caption sits centred under the plinth: the brand, a link to it, the stock, then the controls */
-.hero-stand { left: 50%; right: 0; bottom: clamp(18px, 3.2vh, 34px); flex-direction: column; align-items: center; gap: 14px; text-align: center; pointer-events: none; }
+.hero-stand { left: var(--stand-x, 75%); right: auto; translate: -50% 0; width: max-content; bottom: clamp(18px, 3.2vh, 34px); flex-direction: column; align-items: center; gap: 14px; text-align: center; pointer-events: none; }
+/* the current brand, huge and outlined, fills the space behind the stage */
+.stand-word { position: absolute; z-index: -1; left: var(--stand-x, 72%); top: 47%; translate: -50% -50%; font: italic 900 clamp(7rem, 17vw, 24rem)/.8 var(--display); letter-spacing: -0.03em; text-transform: uppercase; white-space: nowrap; color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, .15); pointer-events: none; user-select: none; }
+.stand-word.swap { animation: wordSwap 1s var(--ease) both; }
+@keyframes wordSwap { from { opacity: 0; transform: translateX(6%) skewX(-6deg); } }
 .hero-stand a, .hero-stand button { pointer-events: auto; }
 .stand-cap { text-align: center; justify-items: center; gap: 4px; }
 .stand-brand { letter-spacing: .2em; color: var(--accent); font-weight: 600; }
@@ -510,7 +514,8 @@ html.th-intro .intro.done { animation: curtain .8s cubic-bezier(.7, 0, .2, 1) fo
   .hero-sub { font-size: var(--step-body); max-width: 32ch; }
   .hero-brands { display: none; }
   .hero-flat { right: 50%; transform: translateX(50%); height: 46%; bottom: 14%; }
-  .hero-stand { left: var(--m); right: var(--m); gap: 8px; bottom: 14px; }
+  .hero-stand { left: var(--m); right: var(--m); translate: none; width: auto; gap: 8px; bottom: 14px; }
+  .stand-word { left: 50%; top: 66%; font-size: 30vw; -webkit-text-stroke-width: 1px; }
   .stand-brand { display: none; }
   .stand-name { font-size: 1.5rem; }
   .stand-nav .icon-btn { width: 36px; height: 36px; }

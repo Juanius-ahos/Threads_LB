@@ -215,6 +215,18 @@
       addEventListener('scroll', onScroll, { passive: true }); onScroll();
       own(() => removeEventListener('scroll', onScroll));
 
+      // where the free space starts: just after the headline block (wide screens).
+      // The stage, the caption and the giant brand word all centre in what is left.
+      let freeL = 0.5;
+      const measure = () => {
+        const hr = hero.getBoundingClientRect(), c = hero.querySelector('.hero-copy');
+        if (!c || !hr.width) return;
+        freeL = Math.min(0.6, Math.max(0.3, (c.getBoundingClientRect().right - hr.left) / hr.width + 0.02));
+        hero.style.setProperty('--stand-x', `${((freeL + 1) / 2 * 100).toFixed(2)}%`);
+      };
+      measure(); addEventListener('resize', measure);
+      own(() => removeEventListener('resize', measure));
+
       let turn = 0;
       const born = performance.now() + (root.classList.contains('th-intro') ? Math.max(0, 1700 - (performance.now() - t0)) : 150);
       const ease = v => 1 - Math.pow(1 - Math.min(1, Math.max(0, v)), 3);
@@ -225,14 +237,15 @@
         // the frame at the plinth's depth decides every size and position
         const hH = halfAt(0), hW = hH * camera.aspect;
         const wide = camera.aspect > 1.1;
-        const cx = wide ? hW * 0.47 : 0;                          // desktop: centre of the right half; phone: centre
-        const cy = wide ? -hH * 0.12 : -hH * 0.36;                // phone: under the headline, above the caption
-        const boxW = wide ? Math.min(hW * 0.6, hH * 1.45) : hW * 1.05;
-        const boxH = wide ? hH * 0.42 : hH * 0.22;
+        const avail = (1 - freeL) * 2 * hW;                        // world width of the free space beside the copy
+        const cx = wide ? ((freeL + 1) / 2 * 2 - 1) * hW : 0;      // desktop: centre of the free space; phone: centre
+        const cy = wide ? -hH * 0.1 : -hH * 0.36;                 // phone: under the headline, above the caption
+        const boxW = wide ? Math.min(avail * 0.44, hH * 1.55) : hW * 1.05;
+        const boxH = wide ? hH * 0.5 : hH * 0.22;
         const floorY = cy - boxH * 0.62;
 
         // plinth under the front logo
-        const pr = wide ? Math.min(boxW * 0.42, hH * 0.55) : boxW * 0.36;
+        const pr = wide ? Math.min(boxW * 0.45, hH * 0.62) : boxW * 0.36;
         plinth.position.set(cx, floorY - (1 - rise) * 2, 0.2);
         plinth.scale.set(pr, 1, pr * 0.92);
         edge.material.opacity = 1;
@@ -258,9 +271,9 @@
 
         // the E behind it all, sized from the frame at its own depth
         const eH = halfAt(E_Z), eW = eH * camera.aspect, depth = (CAM_Z - E_Z) / CAM_Z;
-        const eScale = wide ? Math.min(eH * 1.1 / 3.4, eW * 0.85 / 4.8) : Math.min(eH * 0.4 / 3.4, eW * 1.3 / 4.8);
+        const eScale = wide ? Math.min(eH * 1.18 / 3.4, (1 - freeL) * 2 * eW * 0.78 / 4.8) : Math.min(eH * 0.4 / 3.4, eW * 1.3 / 4.8);
         E.group.scale.setScalar(eScale * (0.85 + 0.15 * rise));
-        E.group.position.set(cx * depth + (wide ? eW * 0.02 : 0), (wide ? cy * depth + eH * 0.3 : cy * depth + eH * 0.13), E_Z);   // the logo stands in front of the E's lower half
+        E.group.position.set(cx * depth, (wide ? cy * depth + eH * 0.3 : cy * depth + eH * 0.13), E_Z);   // the logo stands in front of the E's lower half
         E.group.rotation.set(0.06 + ptr.y * 0.05, -0.28 + ptr.x * 0.1 + Math.sin(t * 0.3) * 0.05, 0);
         E.bars.forEach((b, i) => {
           const [hx, hy] = b.userData.home;
