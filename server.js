@@ -235,6 +235,7 @@ function cleanProductInput(b) {
     sizes: JSON.stringify((Array.isArray(b.sizes) ? b.sizes : []).filter(s => s && String(s.size).trim())
       .map(s => ({ size: String(s.size).trim().slice(0, 20), stock: Math.max(0, parseInt(s.stock, 10) || 0) }))),
     images: JSON.stringify((Array.isArray(b.images) ? b.images : []).filter(u => typeof u === 'string').slice(0, 12)),
+    cutout: /^\/(uploads|products)\/[\w.-]+$/.test(String(b.cutout || '')) ? String(b.cutout) : '',
     featured: b.featured ? 1 : 0,
     active: b.active === false ? 0 : 1,
   };
@@ -251,8 +252,8 @@ app.post('/api/admin/products', (req, res) => {
   if (!p.name || !p.price) return res.status(400).json({ error: 'Name and price are required.' });
   if (!p.sku) p.sku = nextSku(p);
   if (db.prepare('SELECT 1 FROM products WHERE sku = ?').get(p.sku)) return res.status(400).json({ error: `SKU ${p.sku} already exists.` });
-  const info = db.prepare(`INSERT INTO products (sku, name, slug, brand, category, gender, color, swatch, description, price, sale_price, sizes, images, featured, active)
-    VALUES (@sku, @name, @slug, @brand, @category, @gender, @color, @swatch, @description, @price, @sale_price, @sizes, @images, @featured, @active)`)
+  const info = db.prepare(`INSERT INTO products (sku, name, slug, brand, category, gender, color, swatch, description, price, sale_price, sizes, images, cutout, featured, active)
+    VALUES (@sku, @name, @slug, @brand, @category, @gender, @color, @swatch, @description, @price, @sale_price, @sizes, @images, @cutout, @featured, @active)`)
     .run({ ...p, slug: uniqueSlug(`${p.name} ${p.color}`) });
   res.json(rowToProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid)));
 });
@@ -268,8 +269,9 @@ app.put('/api/admin/products/:id', (req, res) => {
   if (clash && clash.id !== id) return res.status(400).json({ error: `SKU ${p.sku} is used by another product.` });
   const slug = old.name === p.name && old.color === p.color ? old.slug : uniqueSlug(`${p.name} ${p.color}`, id);
   db.prepare(`UPDATE products SET sku=@sku, name=@name, slug=@slug, brand=@brand, category=@category, gender=@gender, color=@color, swatch=@swatch,
-    description=@description, price=@price, sale_price=@sale_price, sizes=@sizes, images=@images, featured=@featured, active=@active,
+    description=@description, price=@price, sale_price=@sale_price, sizes=@sizes, images=@images, cutout=@cutout, featured=@featured, active=@active,
     updated_at=datetime('now') WHERE id=@id`).run({ ...p, slug, id });
+  if (old.cutout && old.cutout !== p.cutout) removeUpload(old.cutout);
   const removed = JSON.parse(old.images).filter(u => !JSON.parse(p.images).includes(u));
   removed.forEach(removeUpload);
   res.json(rowToProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(id)));
@@ -301,8 +303,8 @@ app.post('/api/admin/products/bulk', (req, res) => {
 });
 
 app.delete('/api/admin/products/:id', (req, res) => {
-  const row = db.prepare('SELECT images FROM products WHERE id = ?').get(Number(req.params.id));
-  if (row) JSON.parse(row.images).forEach(removeUpload);
+  const row = db.prepare('SELECT images, cutout FROM products WHERE id = ?').get(Number(req.params.id));
+  if (row) { JSON.parse(row.images).forEach(removeUpload); removeUpload(row.cutout); }
   db.prepare('DELETE FROM products WHERE id = ?').run(Number(req.params.id));
   res.json({ ok: true });
 });

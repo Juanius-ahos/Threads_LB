@@ -227,6 +227,7 @@
   const BANNERS = ['nike-trail-run', 'tnf-summit'];
   // transparent cutouts of the shop's own photos: these stand on the 3D stage
   const CUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
+  const cutOf = p => p.cutout || CUTS[p.sku] || '';
   const STEPS = ['Order', 'Confirm', 'Deliver', 'Pay'];
   const STEP_TEXT = (fee, freeOver) => [
     'Pick your size and order in a minute. No account, no card.',
@@ -246,9 +247,9 @@
     const cities = (S.cities || '').split(',').map(c => c.trim()).filter(Boolean).slice(0, 8).join(', ');
     const slides = HOME.slides || [];
     const lead = slides[0] || {};
-    const stage = PRODUCTS.filter(p => CUTS[p.sku]).map(p => ({ p, cut: CUTS[p.sku] }));
+    const stage = PRODUCTS.filter(cutOf).map(p => ({ p, cut: cutOf(p) }));
     const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
-    const newIn = [...groups].sort((a, b) => new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
+    const newIn = [...groups].sort((a, b) => b.some(p => p.featured) - a.some(p => p.featured) || new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
     const tiles = (HOME.brands || []).length ? HOME.brands : BRANDS.map(name => ({ name }));
     const inBrand = b => PRODUCTS.filter(p => p.brand.toLowerCase() === b.toLowerCase()).length;
     const tickerBits = String(HOME.ticker || 'Cash on delivery · 100% original · Delivery all over Lebanon').split('·').map(t => t.trim()).filter(Boolean);
@@ -256,6 +257,7 @@
     const banner = (sl, i) => sl && (sl.title || sl.text) ? `<section class="banner">
         ${ownPic(sl.image, BANNERS[i], '100vw')}
         <div class="banner-copy">
+          ${sl.kicker ? `<p class="hero-kicker">${esc(sl.kicker)}</p>` : ''}
           ${sl.title ? `<h2>${rich(sl.title)}</h2>` : ''}
           ${sl.text ? `<p>${esc(sl.text)}</p>` : ''}
           <div class="cta-row">
@@ -271,12 +273,12 @@
         <div class="hero-gl" aria-hidden="true"></div>
         ${stage.length ? `<img class="hero-flat" src="${stage[0].cut}" alt="" aria-hidden="true">` : ''}
         <div class="hero-copy">
-          <p class="hero-kicker">Activewear &amp; lifestyle · Lebanon</p>
+          <p class="hero-kicker">${esc(lead.kicker || 'Activewear & lifestyle · Lebanon')}</p>
           <h1>${lead.title ? rich(lead.title) : 'Move your <em>way.</em>'}</h1>
           <p class="hero-sub">${esc(lead.text || 'Original Nike, Adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.')}</p>
           <div class="cta-row">
-            <a class="btn btn-green" href="/shop?gender=Women" data-link>Shop women</a>
-            <a class="btn btn-ghost-d" href="/shop?gender=Men" data-link>Shop men</a>
+            <a class="btn btn-green" href="${esc(lead.link || '/shop?gender=Women')}" data-link>${esc(lead.button || 'Shop women')}</a>
+            <a class="btn btn-ghost-d" href="${esc(lead.link2 || '/shop?gender=Men')}" data-link>${esc(lead.button2 || 'Shop men')}</a>
           </div>
           <nav class="hero-brands" aria-label="Brands">${logoRow()}</nav>
         </div>
@@ -500,7 +502,7 @@
     const relatedGroups = groupsOf(PRODUCTS.filter(x => gkey(x) !== gkey(p) && (x.category === p.category || x.brand === p.brand || x.gender === p.gender))).slice(0, 8);
     const waText = encodeURIComponent(`Hi THREADS! I'm interested in the ${p.brand} ${p.name} (${p.color}, ${p.sku}). ${location.href}`);
     const imgs = p.images.length ? p.images : [null];
-    const cut = CUTS[p.sku];
+    const cut = cutOf(p);
     const bkey = p.brand.toLowerCase(), bname = BRAND_NAME[bkey] || p.brand;
     const inBrand = PRODUCTS.filter(x => x.brand.toLowerCase() === bkey).length;
     const off = p.sale_price != null ? Math.round((1 - p.sale_price / p.price) * 100) : 0;

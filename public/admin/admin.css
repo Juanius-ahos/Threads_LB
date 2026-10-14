@@ -290,3 +290,8 @@ select.input { appearance: none; background: #fff url("data:image/svg+xml,%3Csvg
 .hp-prev { width: 120px; aspect-ratio: 4/3; border-radius: 8px; background: #cfd1d4 center/cover; flex: none; border: 1px solid var(--line); }
 .hp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 820px) { .hp-grid { grid-template-columns: 1fr; } .hp-prev { width: 90px; } }
+
+/* 3D cutout in the product form */
+.cut-row { display: flex; align-items: center; gap: 12px; }
+.cut-prev { width: 96px; height: 120px; border-radius: 10px; background: #050505 radial-gradient(60% 50% at 50% 80%, rgba(57, 255, 20, .25), transparent 70%); display: grid; place-items: center; flex: none; overflow: hidden; }
+.cut-prev img { max-width: 86%; max-height: 90%; object-fit: contain; }

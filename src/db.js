@@ -60,6 +60,11 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 if (!db.prepare('PRAGMA table_info(products)').all().some(c => c.name === 'swatch')) {
   db.exec("ALTER TABLE products ADD COLUMN swatch TEXT DEFAULT ''");
 }
+// a transparent photo of the piece alone: it stands on the homepage's 3D stand and the product page's 3D view
+if (!db.prepare('PRAGMA table_info(products)').all().some(c => c.name === 'cutout')) {
+  db.exec("ALTER TABLE products ADD COLUMN cutout TEXT DEFAULT ''");
+}
+const STARTER_CUTOUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
 
 const U = id => `https://images.unsplash.com/${id}`;
 const DEFAULT_HOME = {
@@ -189,6 +194,11 @@ if (count === 0) {
     const sz = sizes.split(',').map(p => { const [size, stock] = p.split(':'); return { size, stock: Number(stock) }; });
     ins.run(sku, name, uniqueSlug(`${name} ${color}`), brand, cat, gender, color, swatch, desc, price, sale, JSON.stringify(sz), JSON.stringify(imgs), feat);
   }
+}
+
+{
+  const fill = db.prepare("UPDATE products SET cutout = ? WHERE sku = ? AND (cutout IS NULL OR cutout = '')");
+  for (const [sku, url] of Object.entries(STARTER_CUTOUTS)) fill.run(url, sku);
 }
 
 module.exports = { DEFAULT_HOME, db, DATA_DIR, UPLOAD_DIR, getSettings, setSetting, slugify, uniqueSlug, rowToProduct };

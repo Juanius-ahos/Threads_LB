@@ -255,6 +255,10 @@
             <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>
             <b>Add photos</b> or drag &amp; drop here<br><small>Straight from your phone is fine — we resize automatically</small></label>
         </div>
+        <div class="card card-pad"><h3>3D cutout <span class="right">optional</span></h3>
+          <p class="hint" style="margin:0 0 12px">A PNG of the piece alone on a <b>transparent background</b>. With one, the piece stands on the homepage's 3D stand and gets a 3D view on its page. Remove.bg or the iPhone "lift subject" tool make these in seconds.</p>
+          <div class="cut-row" id="cutRow"></div>
+        </div>
         <div class="card card-pad"><h3>Details</h3>
           <label class="field"><span>Product name</span><input class="input" name="name" required value="${esc(d.name)}" placeholder="e.g. Dri-FIT Training Tee"></label>
           <div class="g3">
@@ -279,7 +283,7 @@
         </div>
         <div class="card card-pad">
           <label class="toggle"><div><b>Visible in store</b><small>Turn off to hide without deleting</small></div><span class="switch"><input type="checkbox" name="active" ${d.active ? 'checked' : ''}><i></i></span></label>
-          <label class="toggle"><div><b>Feature on homepage</b><small>Shows in "Featured fits"</small></div><span class="switch"><input type="checkbox" name="featured" ${d.featured ? 'checked' : ''}><i></i></span></label>
+          <label class="toggle"><div><b>Feature on homepage</b><small>Shows first in “New in” on the homepage</small></div><span class="switch"><input type="checkbox" name="featured" ${d.featured ? 'checked' : ''}><i></i></span></label>
           <label class="field" style="margin:10px 0 0"><span>SKU <small>(product code — auto-generated if empty)</small></span><input class="input" name="sku" value="${esc(d.sku)}" placeholder="Auto" style="text-transform:uppercase"></label>
         </div>
         <datalist id="dlBrands">${['Nike', 'Adidas', 'On', 'The North Face', 'Puma', 'Under Armour', 'New Balance', 'Asics', 'THREADS'].map(b => `<option value="${b}">`).join('')}</datalist>
@@ -342,13 +346,30 @@
     drop.addEventListener('drop', e => { e.preventDefault(); addFiles(e.dataTransfer.files); });
     drawImgs();
 
+    // the 3D cutout
+    const drawCut = (busy) => {
+      $('#cutRow').innerHTML = busy ? '<div class="cut-prev"><div class="spinner"></div></div>'
+        : d.cutout ? `<div class="cut-prev"><img src="${esc(d.cutout)}" alt=""></div><button type="button" class="btn btn-light btn-sm" id="cutX">Remove</button>`
+        : '<label class="drop" style="padding:14px;flex:1"><input type="file" accept="image/png,image/webp" id="cutFile"><b>Add cutout PNG</b></label>';
+      if ($('#cutX')) $('#cutX').onclick = () => { d.cutout = ''; sh.dataset.dirty = '1'; drawCut(); };
+      if ($('#cutFile')) $('#cutFile').onchange = async e => {
+        const file = e.target.files[0]; if (!file) return;
+        drawCut(true);
+        const fd = new FormData(); fd.append('files', file);
+        try { const r = await api('/api/admin/upload', { method: 'POST', body: fd }); d.cutout = r.urls[0]; sh.dataset.dirty = '1'; }
+        catch (err) { toast(err.message, 1); }
+        drawCut();
+      };
+    };
+    drawCut();
+
     // save
     $('#pSave').onclick = async () => {
       const f = $('#pf');
       if (!f.name.value.trim()) { f.name.focus(); return toast('Give the product a name', 1); }
       if (!(+f.price.value > 0)) { f.price.focus(); return toast('Add a price', 1); }
       const body = { name: f.name.value, brand: f.brand.value, category: f.category.value, color: f.color.value, swatch: f.swatch.value, gender: d.gender, description: f.description.value,
-        price: f.price.value, sale_price: f.sale_price.value, sizes: d.sizes, images: d.images, active: f.active.checked, featured: f.featured.checked, sku: f.sku.value };
+        price: f.price.value, sale_price: f.sale_price.value, sizes: d.sizes, images: d.images, cutout: d.cutout || '', active: f.active.checked, featured: f.featured.checked, sku: f.sku.value };
       const btn = $('#pSave'); btn.disabled = true;
       try {
         await api(isNew ? '/api/admin/products' : `/api/admin/products/${d.id}`, { method: isNew ? 'POST' : 'PUT', body });
@@ -371,6 +392,7 @@
     const s = await api('/api/admin/settings');
     let H; try { H = JSON.parse(s.home || '{}'); } catch { H = {}; }
     H.slides = H.slides || []; H.brands = H.brands || []; H.story = H.story || {};
+    while (H.slides.length < 3) H.slides.push({});   // hero, then the two banners
     const get = path => path.split('.').reduce((o, k) => (o == null ? o : o[k]), H);
     const set = (path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((o, k) => (o[k] ??= {}), H)[last] = v; };
     const inp = (path, label, ph = '', list = '') => `<label class="field"><span>${label}</span><input class="input" data-k="${path}" value="${esc(get(path) || '')}" placeholder="${esc(ph)}" ${list ? `list="${list}"` : ''}></label>`;
@@ -380,34 +402,30 @@
         <label class="btn btn-light btn-sm" style="position:relative;margin-top:8px">Upload photo<input type="file" accept="image/*" data-up="${path}" ${wide ? 'data-wide' : ''} style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div></div></div>`;
     const draw = () => {
       view.innerHTML = `
-        <div class="ph"><h1>Homepage</h1><p class="sub">Change the photos and words on the front page. Tip: wrap a word in *stars* to make it green.</p>
+        <div class="ph"><h1>Homepage</h1><p class="sub">The words and photos on the front page. Wrap a word in *stars* to make it green.</p>
           <div class="actions"><a class="btn btn-light" href="/" target="_blank">Preview store</a><button class="btn btn-dark" id="hpSave">Save homepage</button></div></div>
         <div style="display:grid;gap:14px;max-width:900px">
-          <div class="card card-pad"><h3>Hero slides <span class="right">${H.slides.length} slide${H.slides.length === 1 ? '' : 's'} · rotate every 6s</span></h3>
-            ${H.slides.map((sl, i) => `<div class="hp-slide">
-              <div class="hp-slide-head"><b>Slide ${i + 1}</b><span style="flex:1"></span>
-                <button class="btn btn-light btn-sm" data-mv="${i}" data-d="-1" ${i ? '' : 'disabled'}>↑</button><button class="btn btn-light btn-sm" data-mv="${i}" data-d="1" ${i < H.slides.length - 1 ? '' : 'disabled'}>↓</button>
-                <button class="btn btn-danger btn-sm" data-rm="${i}">Remove</button></div>
-              ${imgField(`slides.${i}.image`, 'Photo (wide, at least 2000px)', true)}
-              <label class="field"><span>Photo focus <small>(which part stays visible on phones)</small></span><select class="input" data-k="slides.${i}.pos">${POSITIONS.map(([v, l]) => `<option value="${v}" ${(sl.pos || 'center') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-              <div class="g2">${inp(`slides.${i}.kicker`, 'Small label', 'New season')}${inp(`slides.${i}.title`, 'Headline', 'Move your *way.*')}</div>
-              ${inp(`slides.${i}.text`, 'Text', 'One short sentence')}
-              <div class="g2">${inp(`slides.${i}.button`, 'Button', 'Shop women')}${inp(`slides.${i}.link`, 'Button link', '/shop', 'dlLinks')}</div>
-              <div class="g2">${inp(`slides.${i}.button2`, 'Second button <small>(optional)</small>', '')}${inp(`slides.${i}.link2`, 'Second link', '', 'dlLinks')}</div>
-            </div>`).join('')}
-            ${H.slides.length < 5 ? '<button class="btn btn-light" id="hpAdd">+ Add slide</button>' : ''}
+          <div class="card card-pad"><h3>Top of the page</h3>
+            <p class="hint" style="margin:0 0 12px">The hero shows your products turning in 3D, so it has no photo. Products appear there once they have a 3D cutout (Products → edit → 3D cutout).</p>
+            <div class="g2">${inp('slides.0.kicker', 'Small label', 'Activewear & lifestyle · Lebanon')}${inp('slides.0.title', 'Headline', 'Move your *way.*')}</div>
+            ${inp('slides.0.text', 'Text', 'One or two short sentences')}
+            <div class="g2">${inp('slides.0.button', 'Button', 'Shop women')}${inp('slides.0.link', 'Button link', '/shop?gender=Women', 'dlLinks')}</div>
+            <div class="g2">${inp('slides.0.button2', 'Second button', 'Shop men')}${inp('slides.0.link2', 'Second link', '/shop?gender=Men', 'dlLinks')}</div>
           </div>
-          <div class="card card-pad"><h3>Brand tiles</h3><div class="hp-grid">
+          ${[1, 2].map(i => `<div class="card card-pad"><h3>${i === 1 ? 'Banner after “New in”' : 'Banner after “Shop by sport”'}</h3>
+            <p class="hint" style="margin:0 0 12px">A full-width photo with a headline. Leave the photo empty to use the campaign photo; leave headline and text empty to hide the banner.</p>
+            ${imgField(`slides.${i}.image`, 'Photo (wide, at least 2000px)', true)}
+            <label class="field"><span>Photo focus <small>(which part stays visible on phones)</small></span><select class="input" data-k="slides.${i}.pos">${POSITIONS.map(([v, l]) => `<option value="${v}" ${((H.slides[i] || {}).pos || 'center') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+            <div class="g2">${inp(`slides.${i}.kicker`, 'Small label', 'New season')}${inp(`slides.${i}.title`, 'Headline', 'Run the *city.*')}</div>
+            ${inp(`slides.${i}.text`, 'Text', 'One short sentence')}
+            <div class="g2">${inp(`slides.${i}.button`, 'Button', 'Shop running')}${inp(`slides.${i}.link`, 'Button link', '/shop', 'dlLinks')}</div>
+          </div>`).join('')}
+          <div class="card card-pad"><h3>Shop by brand <span class="right">photos</span></h3>
+            <p class="hint" style="margin:0 0 12px">Leave a photo empty to use the brand's campaign photo.</p><div class="hp-grid">
             ${H.brands.map((b, i) => `<div class="hp-slide" style="margin:0"><div class="hp-slide-head"><img src="/brand/${{ nike: 'brand-nike', adidas: 'brand-adidas', on: 'brand-on', 'the north face': 'brand-tnf' }[b.name.toLowerCase()] || 'emblem'}.png" style="height:20px;filter:invert(1)" alt=""><b>${esc(b.name)}</b></div>
-              ${imgField(`brands.${i}.image`, 'Photo')}${inp(`brands.${i}.tagline`, 'Tagline')}</div>`).join('')}
+              ${imgField(`brands.${i}.image`, 'Photo')}</div>`).join('')}
           </div></div>
-          <div class="card card-pad"><h3>Women &amp; Men tiles</h3><div class="g2">${imgField('women_image', 'Women photo')}${imgField('men_image', 'Men photo')}</div></div>
-          <div class="card card-pad"><h3>Story section</h3>
-            ${imgField('story.image', 'Photo', true)}
-            <div class="g2">${inp('story.kicker', 'Small label')}${inp('story.title', 'Headline')}</div>
-            <label class="field"><span>Text</span><textarea class="input" data-k="story.text" style="min-height:80px">${esc(H.story.text || '')}</textarea></label>
-            <div class="g2">${inp('story.button', 'Button')}${inp('story.link', 'Button link', '/shop', 'dlLinks')}</div>
-          </div>
+          <div class="card card-pad"><h3>Women &amp; Men</h3><p class="hint" style="margin:0 0 12px">Leave empty to use the campaign photos.</p><div class="g2">${imgField('women_image', 'Women photo')}${imgField('men_image', 'Men photo')}</div></div>
           <div class="card card-pad"><h3>Green ticker</h3>${inp('ticker', 'Words separated by ·', 'Cash on delivery · Nike · Adidas')}</div>
         </div>
         <datalist id="dlLinks">${LINKS.map(l => `<option value="${l}">`).join('')}</datalist>`;
@@ -427,7 +445,7 @@
       $$('[data-mv]').forEach(b => b.onclick = () => { const i = +b.dataset.mv, j = i + +b.dataset.d; [H.slides[i], H.slides[j]] = [H.slides[j], H.slides[i]]; draw(); });
       if ($('#hpAdd')) $('#hpAdd').onclick = () => { H.slides.push({ image: '', pos: 'center', kicker: '', title: 'New *slide*', text: '', button: 'Shop now', link: '/shop' }); draw(); };
       $('#hpSave').onclick = async () => {
-        H.slides = H.slides.filter(sl => sl.image);
+        H.slides = H.slides.slice(0, 3);
         try { await api('/api/admin/settings', { method: 'PUT', body: { home: JSON.stringify(H) } }); toast('Homepage saved 🎉'); draw(); }
         catch (e) { toast(e.message, 1); }
       };

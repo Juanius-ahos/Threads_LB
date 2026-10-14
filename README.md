@@ -21,8 +21,8 @@ npm start
 |---|---|
 | **Home** | New orders waiting, sales chart, low-stock warnings |
 | **Orders** | Every COD order. Tap one to: confirm on WhatsApp with a pre-written message, call, set status (Pending → Confirmed → Shipped → Delivered / Cancelled), print a slip for the driver. Cancelling puts the stock back. Export to Excel. |
-| **Products** | Add or edit products: drag & drop photos straight from the phone (resized automatically), sizes + stock, sale price, hide/show, feature on the homepage |
-| **Homepage** | Change every photo and headline on the front page: hero slides (add, remove, reorder), brand tiles, Women/Men photos, the story section and the green ticker. Upload a photo or paste an image link. Wrap a word in `*stars*` to make it green. |
+| **Products** | Add or edit products: drag & drop photos straight from the phone (resized automatically), sizes + stock, sale price, hide/show, feature on the homepage (featured pieces lead "New in"). Add a **3D cutout** (a PNG of the piece on a transparent background) and the piece stands on the homepage's 3D stand and gets a 3D view on its page. |
+| **Homepage** | The words and photos on the front page: the hero headline, label and buttons, the two campaign banners, brand and Women/Men photos, and the green ticker. Empty photos fall back to the brand campaign photos in `public/campaign/`. Wrap a word in `*stars*` to make it green. |
 | **Excel import** | Download the template, fill one row per product (`Sizes` column like `S:5, M:10, L:3`), upload, preview, import. Same SKU updates the existing product. **Bulk photos:** name photos after the SKU (`NK-TEE-001.jpg`, `NK-TEE-001-2.jpg`) and drop them all at once. |
 | **Community** | People who signed up through the "Your next favorite fit" popup. Export to Excel. |
 | **Settings** | Delivery fee, free delivery threshold, delivery areas, WhatsApp number, announcement bar, welcome popup on/off, password |
@@ -31,7 +31,7 @@ Stock goes down automatically with each order. Sold-out sizes are crossed out in
 
 The store starts with **8 products made from the shop's own photos** (On shorts in 5 colours, On / Nike / The North Face tracksuits). **Prices and stock are placeholders, so check them.** Products with the same brand + name are grouped as colour options of one product.
 
-**About the lifestyle photos:** the homepage photos are from [Unsplash](https://unsplash.com/license), which is free for commercial use, loaded straight from Unsplash's CDN. They are *not* official Nike/Adidas/On/TNF campaign images, because those are copyrighted. If the brands or distributors provide official marketing assets, upload them in **Homepage**.
+**About the campaign photos:** the homepage uses brand campaign photography (Nike, adidas and On press rooms; The North Face from Unsplash), which THREADS has permission to use. Sources are listed in `public/campaign/SOURCES.md`. Upload your own in **Homepage** to replace any of them.
 
 ## Free version on GitHub Pages
 

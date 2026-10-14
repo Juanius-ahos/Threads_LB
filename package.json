@@ -2,7 +2,7 @@
   "name": "threads-store",
   "version": "1.0.0",
   "private": true,
-  "description": "THREADS Activewear & Lifestyle \u2014 storefront with cash-on-delivery checkout and admin panel",
+  "description": "THREADS Activewear & Lifestyle — storefront with cash-on-delivery checkout and admin panel",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,7 +13,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^12.11.1",
     "exceljs": "^4.4.0",
     "express": "^4.22.3",
     "multer": "^2.4.0",
