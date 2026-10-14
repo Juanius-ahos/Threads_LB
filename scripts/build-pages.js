@@ -17,7 +17,7 @@ fs.mkdirSync(out, { recursive: true });
 fs.cpSync(pub, out, { recursive: true, filter: src => !src.startsWith(path.join(pub, 'admin')) });
 
 // root-absolute asset paths become relative to <base href>
-const relative = text => text.replace(/(["'`(])\/(brand|products|css|js|uploads)\//g, '$1$2/');
+const relative = text => text.replace(/(["'`(])\/(brand|products|campaign|css|js|uploads)\//g, '$1$2/');
 
 const html = relative(fs.readFileSync(path.join(pub, 'index.html'), 'utf8'))
   .replace('<head>', `<head>\n  <base href="${base}/">\n  <meta name="th-base" content="${base}">\n  <meta name="th-static" content="1">`);
@@ -31,7 +31,7 @@ const uploads = path.join(require('../src/db').DATA_DIR, 'uploads');
 if (fs.existsSync(uploads)) fs.cpSync(uploads, path.join(out, 'uploads'), { recursive: true });
 
 const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY featured DESC, created_at DESC, id DESC').all()
-  .map(rowToProduct).map(p => ({ ...p, images: p.images.map(u => u.startsWith('/') ? u.slice(1) : u) }));
+  .map(rowToProduct).map(p => ({ ...p, images: p.images.map(u => u.startsWith('/') ? u.slice(1) : u), cutout: (p.cutout || '').replace(/^\//, '') }));
 const s = getSettings();
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
 fs.writeFileSync(path.join(out, 'data', 'products.json'), JSON.stringify(products));
