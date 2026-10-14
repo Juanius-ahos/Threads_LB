@@ -10,21 +10,21 @@ const out = path.resolve(process.argv[2] || 'dist');
 // repo name without slashes (Git Bash rewrites arguments that start with "/")
 const base = '/' + (process.argv[3] || 'Threads_LB').replace(/^.*[\\/]/, '').replace(/\/$/, '');
 const pub = path.join(__dirname, '..', 'public');
-const PUBLIC_KEYS = ['store_name', 'currency', 'delivery_fee', 'free_delivery_over', 'whatsapp', 'instagram', 'announcement', 'welcome_popup', 'require_signup', 'cities', 'home'];
+const PUBLIC_KEYS = ['store_name', 'currency', 'delivery_fee', 'free_delivery_over', 'whatsapp', 'instagram', 'announcement', 'store_address', 'store_hours', 'welcome_popup', 'require_signup', 'cities', 'home'];
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 fs.cpSync(pub, out, { recursive: true, filter: src => !src.startsWith(path.join(pub, 'admin')) });
 
 // root-absolute asset paths become relative to <base href>
-const relative = text => text.replace(/(["'`(])\/(brand|products|campaign|css|js|uploads)\//g, '$1$2/');
+const relative = text => text.replace(/(["'`(])\/(brand|products|campaign|instore|css|js|uploads)\//g, '$1$2/');
 
 const html = relative(fs.readFileSync(path.join(pub, 'index.html'), 'utf8'))
   .replace('<head>', `<head>\n  <base href="${base}/">\n  <meta name="th-base" content="${base}">\n  <meta name="th-static" content="1">`);
 fs.writeFileSync(path.join(out, 'index.html'), html);
 fs.writeFileSync(path.join(out, '404.html'), html);          // deep links like /shop open the app too
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
-fs.writeFileSync(path.join(out, 'js', 'store.js'), relative(fs.readFileSync(path.join(pub, 'js', 'store.js'), 'utf8')));
+for (const js of ['store.js', 'home-defaults.js']) fs.writeFileSync(path.join(out, 'js', js), relative(fs.readFileSync(path.join(pub, 'js', js), 'utf8')));
 
 // uploaded photos (from the admin) travel with the build
 const uploads = path.join(require('../src/db').DATA_DIR, 'uploads');
@@ -35,5 +35,8 @@ const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY fe
 const s = getSettings();
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
 fs.writeFileSync(path.join(out, 'data', 'products.json'), JSON.stringify(products));
-fs.writeFileSync(path.join(out, 'data', 'settings.json'), JSON.stringify(Object.fromEntries(PUBLIC_KEYS.map(k => [k, s[k]]))));
+// photos uploaded in the admin are stored as /uploads/...; on Pages they live next to the page
+const pub2 = Object.fromEntries(PUBLIC_KEYS.map(k => [k, s[k]]));
+if (pub2.home) pub2.home = pub2.home.replace(/"\/(brand|products|campaign|instore|uploads)\//g, '"$1/');
+fs.writeFileSync(path.join(out, 'data', 'settings.json'), JSON.stringify(pub2));
 console.log(`Built ${products.length} products into ${out} for ${base}/`);

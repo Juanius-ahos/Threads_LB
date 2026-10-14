@@ -19,7 +19,7 @@ app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
 // ---------- helpers ----------
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const PUBLIC_SETTINGS = ['store_name', 'currency', 'delivery_fee', 'free_delivery_over', 'whatsapp', 'instagram', 'announcement', 'hero_image', 'welcome_popup', 'require_signup', 'cities', 'home'];
+const PUBLIC_SETTINGS = ['store_name', 'currency', 'delivery_fee', 'free_delivery_over', 'whatsapp', 'instagram', 'announcement', 'store_address', 'store_hours', 'welcome_popup', 'require_signup', 'cities', 'home'];
 
 async function saveImage(buffer, wide) {
   const name = `${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.webp`;

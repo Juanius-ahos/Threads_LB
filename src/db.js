@@ -66,24 +66,20 @@ if (!db.prepare('PRAGMA table_info(products)').all().some(c => c.name === 'cutou
 }
 const STARTER_CUTOUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
 
-const U = id => `https://images.unsplash.com/${id}`;
+// Empty photos fall back to the campaign photography in public/campaign.
 const DEFAULT_HOME = {
   slides: [
-    { image: U('photo-1574680088814-c9e8a10d8a4d'), pos: '70% 30%', title: 'Move your *way.*', text: 'Original Nike, Adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.', button: 'Shop women', link: '/shop?gender=Women', button2: 'Shop men', link2: '/shop?gender=Men' },
-    { image: U('photo-1552674605-db6ffd4facb5'), pos: '50% 60%', title: 'Run the *city.*', text: 'Lightweight layers and 2-in-1 shorts built for early miles and late laps.', button: 'Shop running', link: '/shop?category=Shorts', button2: '', link2: '' },
-    { image: U('photo-1608748180154-b4eaa0da7634'), pos: '50% 35%', title: 'Built for *outside.*', text: 'Tracksuits and jackets that handle the weather — from Beirut streets to the mountains.', button: 'Shop The North Face', link: '/shop?brand=The%20North%20Face', button2: '', link2: '' },
+    { kicker: 'Now open in Wadi Chahrour', title: 'Move your *way.*', text: 'Original Nike, adidas, On and The North Face. Order online and pay cash at your door anywhere in Lebanon, or come try it on in store.', button: 'Shop women', link: '/shop?gender=Women', button2: 'Shop men', link2: '/shop?gender=Men' },
+    { image: '', pos: 'center', kicker: 'Running', title: 'Early miles. *Light layers.*', text: 'Windbreakers and 2-in-1 shorts from Nike and On, made for the Corniche at 6 am.', button: 'Shop running', link: '/shop?category=Shorts' },
+    { image: '', pos: 'center', kicker: 'The North Face', title: 'Made for the *mountains.*', text: 'Warm, weather-ready sets for cold mornings in Faraya and long days outside.', button: 'Shop The North Face', link: '/shop?brand=The%20North%20Face' },
   ],
-  brands: [
-    { name: 'Nike', image: U('photo-1726195222023-9016a7250717'), tagline: 'Just move' },
-    { name: 'Adidas', image: U('photo-1511746315387-c4a76990fdce'), tagline: 'Three stripes' },
-    { name: 'On', image: U('photo-1718248028293-934f04a578db'), tagline: 'Run on clouds' },
-    { name: 'The North Face', image: U('photo-1618329918461-51bb072e0ea5'), tagline: 'Never stop exploring' },
-  ],
-  men_image: U('photo-1556705634-7754fc9519f9'),
-  women_image: U('photo-1784924176852-72159d35e030'),
-  story: { image: U('photo-1541534741688-6078c6bfb5c5'), title: 'Gear that *keeps up.*', text: '100% original pieces from the brands you trust, picked for training, running and everyday life. Order in a minute, pay cash on delivery, swap sizes easily on WhatsApp.', button: 'Shop all', link: '/shop' },
-  ticker: 'Cash on delivery · Nike · Adidas · On · The North Face · Delivery all over Lebanon · 100% original',
+  brands: [{ name: 'Nike', image: '' }, { name: 'Adidas', image: '' }, { name: 'On', image: '' }, { name: 'The North Face', image: '' }],
+  men_image: '',
+  women_image: '',
+  ticker: '100% original · Cash on delivery · Delivery all over Lebanon · Now open in Wadi Chahrour · Easy size swaps on WhatsApp',
 };
+// The homepage the first version shipped with (placeholder photos). A store still on it gets the new one.
+const LEGACY_HOME_MARK = 'photo-1574680088814-c9e8a10d8a4d';
 
 const DEFAULT_SETTINGS = {
   store_name: 'THREADS Activewear & Lifestyle',
@@ -93,7 +89,8 @@ const DEFAULT_SETTINGS = {
   whatsapp: '96100000000',
   instagram: 'https://www.instagram.com/threadsactivewear/',
   announcement: 'Cash on delivery all over Lebanon · Free delivery on orders over $100',
-  hero_image: '/brand/hero.jpg',
+  store_address: 'Ste. Takla Centre, Wadi Chahrour El Soufla, Main Road',
+  store_hours: '',
   welcome_popup: '1',
   require_signup: '1',
   home: JSON.stringify(DEFAULT_HOME),
@@ -196,6 +193,10 @@ if (count === 0) {
   }
 }
 
+{
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'home'").get();
+  if (row && row.value.includes(LEGACY_HOME_MARK)) db.prepare("UPDATE settings SET value = ? WHERE key = 'home'").run(JSON.stringify(DEFAULT_HOME));
+}
 {
   const fill = db.prepare("UPDATE products SET cutout = ? WHERE sku = ? AND (cutout IS NULL OR cutout = '')");
   for (const [sku, url] of Object.entries(STARTER_CUTOUTS)) fill.run(url, sku);

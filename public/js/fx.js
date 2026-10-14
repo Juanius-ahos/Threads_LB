@@ -197,6 +197,8 @@
       own(() => removeEventListener('scroll', onScroll));
 
       let turn = 0, sx = 0;
+      // the stand rises into place once (after the intro curtain, when there is one)
+      const born = performance.now() + (root.classList.contains('th-intro') ? Math.max(0, 1700 - (performance.now() - t0)) : 150);
       s.onTick(t => {
         turn += (target - turn) * (drag ? 0.25 : 0.075);
         const wide = camera.aspect > 1.15;
@@ -205,7 +207,9 @@
         sx += ((wide ? halfW * 0.5 : 0) - sx) * 0.2;
         // on phones the stand is smaller and sits under the headline
         const floor = FLOOR;
-        ring.position.set(sx, wide ? 0 : -1.05, 0);
+        const rise = Math.min(1, Math.max(0, (performance.now() - born) / 1700)), up = 1 - Math.pow(1 - rise, 3);
+        ring.position.set(sx, (wide ? 0 : -1.05) - (1 - up) * 3.2, 0);
+        ring.rotation.y = (1 - up) * -1.4;
         ring.scale.setScalar(wide ? 1 : 0.55);
         cards.forEach((m, i) => {
           const a = m.userData.angle - (turn / n) * Math.PI * 2;
@@ -334,6 +338,7 @@
   function product(app) {
     const g3d = app.querySelector('.g3d');
     if (g3d) showcase(g3d, g3d.querySelector('.g3d-flat').getAttribute('src'));
+    magnets(app);
     if (!GSAP() || reduce) return;
     const tws = [];
     own(() => tws.forEach(t => { if (t.scrollTrigger) t.scrollTrigger.kill(); t.kill(); }));
@@ -447,8 +452,159 @@
     if (ig) keep(gsap.from(ig, { x: -60, opacity: 0, duration: 1, ease: 'expo.out', scrollTrigger: once(ig, 'top 90%') }));
   }
 
+  // ---------- scroll progress through a tall section (0 → 1 while its sticky stage is pinned) ----------
+  function progress(el, cb) {
+    if (GSAP()) {
+      const st = ScrollTrigger.create({ trigger: el, start: 'top top', end: 'bottom bottom', onUpdate: s => cb(s.progress) });
+      cb(st.progress);
+      own(() => st.kill());
+      return;
+    }
+    let raf = 0;
+    const read = () => { raf = 0; const r = el.getBoundingClientRect(); const span = r.height - innerHeight; cb(span > 0 ? Math.min(1, Math.max(0, -r.top / span)) : 0); };
+    const on = () => { if (!raf) raf = requestAnimationFrame(read); };
+    addEventListener('scroll', on, { passive: true }); addEventListener('resize', on);
+    read();
+    own(() => { removeEventListener('scroll', on); removeEventListener('resize', on); cancelAnimationFrame(raf); });
+  }
+
+  // ---------- the three bars: each one carries a promise ----------
+  // The E floats in the middle. While you scroll the bars pull apart one by one, each next to its promise,
+  // then lock back into the logo at the end.
+  function promises(sec) {
+    const marks = [...sec.querySelectorAll('[data-step]')];
+    const n = marks.length;
+    let p = 0, cur = -1;
+    progress(sec, v => {
+      p = v;
+      const i = v < 0.08 ? -1 : Math.min(n - 1, Math.floor((v - 0.08) / (0.8 / n)));
+      if (i !== cur) { cur = i; marks.forEach(m => { const j = +m.dataset.step; m.classList.toggle('on', j === i); m.classList.toggle('past', j < i); }); }
+    });
+    if (reduce || !hasGL) return;
+    three().then(THREE => {
+      if (!sec.isConnected) return;
+      const s = stage(THREE, sec.querySelector('.promises-gl'), { fov: 32, z: 13 });
+      const E = makeE(THREE, 0xe9e9e6);
+      E.group.scale.setScalar(1);
+      s.scene.add(E.group);
+      s.scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+      const key = new THREE.DirectionalLight(0xffffff, 2); key.position.set(4, 6, 8); s.scene.add(key);
+      const rim = new THREE.PointLight(GREEN, 70, 40); rim.position.set(-6, -3, 5); s.scene.add(rim);
+      // where each bar travels to when its promise is told (x, y, rotation)
+      const wide = () => s.camera.aspect > 1.1;
+      // wide screens: the bars spread down the right half, the promises read down the left
+      const AWAY = () => wide() ? [[0, 2.5, -0.25], [0, 0, 0.25], [0, -2.5, -0.25]] : [[0, 2.6, -0.2], [0, 0.2, 0.2], [0, -2.2, -0.2]];
+      let sp = 0;
+      s.onTick(t => {
+        sp += (p - sp) * 0.08;
+        // 0 → 1 → 0 across the section: apart in the middle, the logo again at both ends
+        const open = sp < 0.85 ? Math.min(1, sp / 0.12) : Math.max(0, 1 - (sp - 0.85) / 0.12);
+        const away = AWAY();
+        E.bars.forEach((b, i) => {
+          const [hx, hy] = b.userData.home, [ax, ay, ar] = away[i];
+          const turn = Math.min(1, Math.max(0, (sp - 0.08 - i * (0.8 / 3)) / 0.12)) * open;   // this bar's moment
+          const k = Math.max(turn, open * 0.25);
+          b.position.set(hx + (ax - hx) * k - (wide() ? turn * 0.9 : 0), hy + (ay - hy) * k, Math.sin(t * 1.1 + i * 1.4) * 0.3 + turn * 1.4);
+          b.rotation.set(Math.sin(t * 0.7 + i) * 0.08, ar * k + Math.sin(t * 0.5 + i) * 0.1, ar * k * 0.4);
+        });
+        E.group.position.x += ((wide() ? 2.8 * open : 0) - E.group.position.x) * 0.1;
+        E.group.rotation.y = ptr.x * 0.25 + Math.sin(t * 0.4) * 0.12;
+        E.group.rotation.x = ptr.y * 0.12;
+      });
+      sec.classList.add('ready');
+      own(() => s.dispose());
+    }).catch(() => {});
+  }
+
+  // ---------- craft: cursor, magnetic buttons, leaning cards, the draggable wall ----------
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  let cursor = null;
+  function setupCursor() {
+    if (!fine || reduce || cursor) return;
+    cursor = document.createElement('div');
+    cursor.className = 'cursor'; cursor.innerHTML = '<b></b>';
+    document.body.appendChild(cursor);
+    root.classList.add('has-cursor');
+    let x = innerWidth / 2, y = innerHeight / 2, cx = x, cy = y;
+    addEventListener('pointermove', e => { x = e.clientX; y = e.clientY; cursor.classList.add('on'); }, { passive: true });
+    document.addEventListener('pointerleave', () => cursor.classList.remove('on'));
+    addEventListener('pointerdown', () => cursor.classList.add('down'));
+    addEventListener('pointerup', () => cursor.classList.remove('down'));
+    // what a click does here, said in one word
+    document.addEventListener('pointerover', e => {
+      const t = e.target.closest('[data-cursor], .card, .hero-gl, .wall-item, .cat-index a, .g3d');
+      const label = !t ? '' : t.dataset.cursor || (t.matches('.hero-gl, .g3d') ? (t.matches('.g3d') ? '3D' : 'Drag') : t.matches('.wall-item') ? 'Drag' : 'View');
+      cursor.classList.toggle('big', !!label);
+      cursor.firstChild.textContent = label;
+    });
+    const loop = () => { cx += (x - cx) * 0.22; cy += (y - cy) * 0.22; cursor.style.transform = `translate(${cx}px, ${cy}px)`; requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  }
+
+  // buttons lean toward the pointer, a little
+  function magnets(app) {
+    if (!fine || reduce) return;
+    app.querySelectorAll('.hero-copy .btn, .banner-copy .btn, .visit .btn, .stand-nav .icon-btn, .pick-info .btn').forEach(b => {
+      const move = e => { const r = b.getBoundingClientRect(); b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.25}px, ${(e.clientY - r.top - r.height / 2) * 0.35}px)`; };
+      const out = () => { b.style.transform = ''; };
+      b.addEventListener('pointermove', move); b.addEventListener('pointerleave', out);
+      b.style.transition = 'transform .35s cubic-bezier(.2,.8,.2,1), background .2s, color .2s, border-color .2s';
+      own(() => { b.removeEventListener('pointermove', move); b.removeEventListener('pointerleave', out); });
+    });
+  }
+
+  // product photos lean toward the pointer and catch a soft light (delegated, works on every page)
+  if (fine && !reduce) {
+    document.addEventListener('pointermove', e => {
+      const m = e.target.closest && e.target.closest('.card-media');
+      if (!m) return;
+      const r = m.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+      m.style.transform = `perspective(900px) rotateY(${(px - 0.5) * 8}deg) rotateX(${(0.5 - py) * 8}deg)`;
+      m.style.setProperty('--mx', `${px * 100}%`); m.style.setProperty('--my', `${py * 100}%`);
+    }, { passive: true });
+    document.addEventListener('pointerout', e => {
+      const m = e.target.closest && e.target.closest('.card-media');
+      if (m && !m.contains(e.relatedTarget)) m.style.transform = '';
+    });
+  }
+
+  // the wall: drag it sideways with the mouse; it keeps gliding and leans while it moves
+  function wall(app) {
+    const w = app.querySelector('#wall'); if (!w) return;
+    const items = [...w.children];
+    let down = false, sx = 0, sl = 0, v = 0, last = 0, lastX = 0, raf = 0, moved = false;
+    const lean = () => { const k = Math.max(-8, Math.min(8, -v * 0.5)); items.forEach(i => i.style.setProperty('--skew', `${k}deg`)); };
+    const glide = () => { v *= 0.94; w.scrollLeft -= v; lean(); if (Math.abs(v) > 0.3) raf = requestAnimationFrame(glide); else { v = 0; lean(); } };
+    const dn = e => { if (e.pointerType !== 'mouse' || e.button) return; down = true; moved = false; sx = lastX = e.clientX; sl = w.scrollLeft; last = performance.now(); cancelAnimationFrame(raf); };
+    const mv = e => {
+      if (!down) return;
+      const dx = e.clientX - sx;
+      if (Math.abs(dx) > 4) { moved = true; w.classList.add('dragging'); }
+      w.scrollLeft = sl - dx;
+      const now = performance.now(); v = (e.clientX - lastX) / Math.max(1, now - last) * 16; lastX = e.clientX; last = now; lean();
+    };
+    const up = () => { if (!down) return; down = false; setTimeout(() => w.classList.remove('dragging'), 0); if (!reduce) raf = requestAnimationFrame(glide); };
+    const click = e => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } };
+    w.addEventListener('pointerdown', dn); addEventListener('pointermove', mv); addEventListener('pointerup', up); w.addEventListener('click', click, true);
+    own(() => { w.removeEventListener('pointerdown', dn); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); cancelAnimationFrame(raf); });
+  }
+
+  // ---------- smooth scrolling (mouse and trackpad only; touch keeps the phone's own scrolling) ----------
+  let lenis = null;
+  function setupSmooth() {
+    if (reduce || coarse || !window.Lenis || lenis) return;
+    lenis = new Lenis({ lerp: 0.11, wheelMultiplier: 1, smoothWheel: true });
+    if (GSAP()) { lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add(t => lenis.raf(t * 1000)); gsap.ticker.lagSmoothing(0); }
+    else { const f = t => { lenis.raf(t); requestAnimationFrame(f); }; requestAnimationFrame(f); }
+    // when the bag, the menu or a dialog locks the page, the smooth scroller stops too
+    new MutationObserver(() => { (root.style.overflow === 'hidden' || root.classList.contains('th-intro')) ? lenis.stop() : lenis.start(); }).observe(root, { attributes: true, attributeFilter: ['style', 'class'] });
+  }
+
   // ---------- the home page ----------
   function home(app) {
+    const pr = app.querySelector('#promises'); if (pr) promises(pr);
+    magnets(app);
+    wall(app);
     // the ticker runs faster while you scroll, in the direction you scroll
     const run = app.querySelector('.ticker-run');
     if (run && !reduce && run.getAnimations) {
@@ -481,6 +637,7 @@
   // ---------- route hooks, called by store.js ----------
   function leave() { disposers.forEach(fn => { try { fn(); } catch {} }); disposers = []; }
   function enter(path, app) {
+    if (lenis) lenis.resize();
     if (path === '/') home(app);
     else if (path.startsWith('/p/')) product(app);
   }
@@ -491,6 +648,9 @@
     const ob = new IntersectionObserver(([en]) => { if (!en.isIntersecting) return; ob.disconnect(); emblem(fE); }, { rootMargin: '400px' });
     ob.observe(fE);
   }
+
+  setupCursor();
+  setupSmooth();
 
   window.FX = { introDone, transition, leave, enter, stand, fly };
 })();

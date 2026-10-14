@@ -287,7 +287,7 @@
           <label class="field" style="margin:10px 0 0"><span>SKU <small>(product code — auto-generated if empty)</small></span><input class="input" name="sku" value="${esc(d.sku)}" placeholder="Auto" style="text-transform:uppercase"></label>
         </div>
         <datalist id="dlBrands">${['Nike', 'Adidas', 'On', 'The North Face', 'Puma', 'Under Armour', 'New Balance', 'Asics', 'THREADS'].map(b => `<option value="${b}">`).join('')}</datalist>
-        <datalist id="dlCats">${CATEGORIES.map(c => `<option value="${c}">`).join('')}</datalist>
+        <datalist id="dlCats">${[...new Set([...(() => { try { return (JSON.parse(SET.home || '{}').categories || (window.HOME_DEFAULTS || {}).categories || []).map(c => c.name); } catch { return []; } })(), ...CATEGORIES])].map(c => `<option value="${c}">`).join('')}</datalist>
       </form>
       <div class="sheet-foot">${isNew ? '' : '<button class="btn btn-danger" id="pDel">Delete</button>'}${isNew ? '' : `<a class="btn btn-light" href="/p/${esc(d.slug)}" target="_blank">View</a>`}<span class="grow"></span><button class="btn btn-light" id="pCancel">Cancel</button><button class="btn btn-dark" id="pSave">${isNew ? 'Add product' : 'Save'}</button></div>`);
     sh.dataset.dirty = '';
@@ -393,6 +393,16 @@
     let H; try { H = JSON.parse(s.home || '{}'); } catch { H = {}; }
     H.slides = H.slides || []; H.brands = H.brands || []; H.story = H.story || {};
     while (H.slides.length < 3) H.slides.push({});   // hero, then the two banners
+    const D = JSON.parse(JSON.stringify(window.HOME_DEFAULTS || {}));
+    for (const k of ['promises', 'wall', 'categories', 'faq', 'brands']) if (!Array.isArray(H[k]) || !H[k].length) H[k] = D[k] || [];
+    H.sections = { ...(D.sections || {}), ...(H.sections || {}) };
+    const PRODS = await api('/api/admin/products').catch(() => []);
+    const SECTIONS = [['promises', 'The three bars (3D promises)'], ['wall', 'On the wall'], ['banner1', 'Banner 1'], ['categories', 'Shop by category'], ['brands', 'Four brands'], ['pick', 'Pick your colour'], ['banner2', 'Banner 2'], ['how', 'Cash on delivery steps'], ['visit', 'Visit the store'], ['faq', 'Questions']];
+    // a list the owner can grow, shrink and reorder
+    const rowHead = (list, i, title) => `<div class="hp-slide-head"><b>${title}</b><span style="flex:1"></span>
+      <button type="button" class="btn btn-light btn-sm" data-lmv="${list}" data-i="${i}" data-d="-1" ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn btn-light btn-sm" data-lmv="${list}" data-i="${i}" data-d="1" ${i < H[list].length - 1 ? '' : 'disabled'}>↓</button>
+      <button type="button" class="btn btn-danger btn-sm" data-lrm="${list}" data-i="${i}">Remove</button></div>`;
+    const BLANK = { wall: { image: '', caption: '', sku: '', link: '' }, categories: { name: '', image: '' }, faq: { q: '', a: '' }, brands: { name: '', logo: '', image: '' } };
     const get = path => path.split('.').reduce((o, k) => (o == null ? o : o[k]), H);
     const set = (path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((o, k) => (o[k] ??= {}), H)[last] = v; };
     const inp = (path, label, ph = '', list = '') => `<label class="field"><span>${label}</span><input class="input" data-k="${path}" value="${esc(get(path) || '')}" placeholder="${esc(ph)}" ${list ? `list="${list}"` : ''}></label>`;
@@ -412,7 +422,7 @@
             <div class="g2">${inp('slides.0.button', 'Button', 'Shop women')}${inp('slides.0.link', 'Button link', '/shop?gender=Women', 'dlLinks')}</div>
             <div class="g2">${inp('slides.0.button2', 'Second button', 'Shop men')}${inp('slides.0.link2', 'Second link', '/shop?gender=Men', 'dlLinks')}</div>
           </div>
-          ${[1, 2].map(i => `<div class="card card-pad"><h3>${i === 1 ? 'Banner after “New in”' : 'Banner after “Shop by sport”'}</h3>
+          ${[1, 2].map(i => `<div class="card card-pad"><h3>${i === 1 ? 'Banner 1 <span class="right">after “On the wall”</span>' : 'Banner 2 <span class="right">after the colour picker</span>'}</h3>
             <p class="hint" style="margin:0 0 12px">A full-width photo with a headline. Leave the photo empty to use the campaign photo; leave headline and text empty to hide the banner.</p>
             ${imgField(`slides.${i}.image`, 'Photo (wide, at least 2000px)', true)}
             <label class="field"><span>Photo focus <small>(which part stays visible on phones)</small></span><select class="input" data-k="slides.${i}.pos">${POSITIONS.map(([v, l]) => `<option value="${v}" ${((H.slides[i] || {}).pos || 'center') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -420,11 +430,42 @@
             ${inp(`slides.${i}.text`, 'Text', 'One short sentence')}
             <div class="g2">${inp(`slides.${i}.button`, 'Button', 'Shop running')}${inp(`slides.${i}.link`, 'Button link', '/shop', 'dlLinks')}</div>
           </div>`).join('')}
-          <div class="card card-pad"><h3>Shop by brand <span class="right">photos</span></h3>
-            <p class="hint" style="margin:0 0 12px">Leave a photo empty to use the brand's campaign photo.</p><div class="hp-grid">
-            ${H.brands.map((b, i) => `<div class="hp-slide" style="margin:0"><div class="hp-slide-head"><img src="/brand/${{ nike: 'brand-nike', adidas: 'brand-adidas', on: 'brand-on', 'the north face': 'brand-tnf' }[b.name.toLowerCase()] || 'emblem'}.png" style="height:20px;filter:invert(1)" alt=""><b>${esc(b.name)}</b></div>
-              ${imgField(`brands.${i}.image`, 'Photo')}</div>`).join('')}
+          <div class="card card-pad"><h3>Sections <span class="right">turn parts of the homepage on or off</span></h3><div class="hp-grid">
+            ${SECTIONS.map(([k, l]) => `<label class="toggle" style="margin:0"><div><b>${l}</b></div><span class="switch"><input type="checkbox" data-check="sections.${k}" ${H.sections[k] !== false ? 'checked' : ''}><i></i></span></label>`).join('')}
           </div></div>
+          <div class="card card-pad"><h3>The three bars <span class="right">the logo's bars pull apart to tell these</span></h3>
+            ${[0, 1, 2].map(i => `<div class="g2">${inp(`promises.${i}.title`, `Bar ${i + 1}${i === 1 ? ' (green)' : ''}`, '100% original')}${inp(`promises.${i}.text`, 'Line', 'One short sentence')}</div>`).join('')}
+          </div>
+          <div class="card card-pad"><h3>On the wall <span class="right">${H.wall.length} photo${H.wall.length === 1 ? '' : 's'}</span></h3>
+            <p class="hint" style="margin:0 0 12px">Photos from the shop. Pick the product each one shows and it links straight to it with its price; otherwise add any link (an Instagram post, WhatsApp).</p>
+            ${H.wall.map((w, i) => `<div class="hp-slide">${rowHead('wall', i, `Photo ${i + 1}`)}
+              ${imgField(`wall.${i}.image`, 'Photo (portrait)')}
+              <div class="g2">${inp(`wall.${i}.caption`, 'Caption', 'Black or taupe?')}
+                <label class="field"><span>Product</span><select class="input" data-k="wall.${i}.sku"><option value="">— none, use the link —</option>${PRODS.map(p => `<option value="${esc(p.sku)}" ${p.sku === w.sku ? 'selected' : ''}>${esc(`${p.brand} ${p.name}, ${p.color}`)}</option>`).join('')}</select></label></div>
+              ${inp(`wall.${i}.link`, 'Link <small>(when no product is picked)</small>', 'https://www.instagram.com/p/...')}
+            </div>`).join('')}
+            <button type="button" class="btn btn-light" data-ladd="wall">+ Add photo</button>
+          </div>
+          <div class="card card-pad"><h3>Categories <span class="right">menu, footer and the homepage index</span></h3>
+            <p class="hint" style="margin:0 0 12px">A category shows on the site once a product uses it (Products → edit → Category). Only categories with products appear.</p>
+            ${H.categories.map((c, i) => `<div class="hp-slide">${rowHead('categories', i, `${esc(c.name || 'New category')} <small style="font-weight:500;color:var(--muted)">${PRODS.filter(p => (p.category || '').toLowerCase() === (c.name || '').toLowerCase()).length} products</small>`)}
+              <div class="g2">${inp(`categories.${i}.name`, 'Name', 'Tracksuits')}${imgField(`categories.${i}.image`, 'Photo <small>(optional)</small>')}</div></div>`).join('')}
+            <button type="button" class="btn btn-light" data-ladd="categories">+ Add category</button>
+          </div>
+          <div class="card card-pad"><h3>Brands <span class="right">logos and photos</span></h3>
+            <p class="hint" style="margin:0 0 12px">The brand's name must match the Brand field on its products. Logos look best as white PNGs on a transparent background. Leave a photo empty to use the brand's campaign photo.</p>
+            ${H.brands.map((b, i) => `<div class="hp-slide">${rowHead('brands', i, esc(b.name || 'New brand'))}
+              ${inp(`brands.${i}.name`, 'Name', 'Nike')}
+              <div class="g2">${imgField(`brands.${i}.logo`, 'Logo')}${imgField(`brands.${i}.image`, 'Photo')}</div></div>`).join('')}
+            <button type="button" class="btn btn-light" data-ladd="brands">+ Add brand</button>
+          </div>
+          <div class="card card-pad"><h3>Questions <span class="right">${H.faq.length}</span></h3>
+            <p class="hint" style="margin:0 0 12px">In answers, <b>{fee}</b>, <b>{free}</b>, <b>{cities}</b> and <b>{address}</b> are filled in from Settings.</p>
+            ${H.faq.map((q, i) => `<div class="hp-slide">${rowHead('faq', i, `Question ${i + 1}`)}
+              ${inp(`faq.${i}.q`, 'Question', 'How do I pay?')}
+              <label class="field"><span>Answer</span><textarea class="input" data-k="faq.${i}.a" style="min-height:70px">${esc(q.a || '')}</textarea></label></div>`).join('')}
+            <button type="button" class="btn btn-light" data-ladd="faq">+ Add question</button>
+          </div>
           <div class="card card-pad"><h3>Women &amp; Men</h3><p class="hint" style="margin:0 0 12px">Leave empty to use the campaign photos.</p><div class="g2">${imgField('women_image', 'Women photo')}${imgField('men_image', 'Men photo')}</div></div>
           <div class="card card-pad"><h3>Green ticker</h3>${inp('ticker', 'Words separated by ·', 'Cash on delivery · Nike · Adidas')}</div>
         </div>
@@ -441,11 +482,16 @@
         try { const r = await api('/api/admin/upload' + (el.dataset.wide !== undefined ? '?wide=1' : ''), { method: 'POST', body: fd }); set(el.dataset.up, r.urls[0]); draw(); toast('Photo uploaded — remember to Save'); }
         catch (e) { toast(e.message, 1); el.parentElement.firstChild.textContent = 'Upload photo'; }
       });
+      $$('[data-check]').forEach(el => el.onchange = () => set(el.dataset.check, el.checked));
+      $$('[data-ladd]').forEach(b => b.onclick = () => { H[b.dataset.ladd].push({ ...BLANK[b.dataset.ladd] }); draw(); });
+      $$('[data-lrm]').forEach(b => b.onclick = () => { if (confirmBox('Remove this?')) { H[b.dataset.lrm].splice(+b.dataset.i, 1); draw(); } });
+      $$('[data-lmv]').forEach(b => b.onclick = () => { const L = H[b.dataset.lmv], i = +b.dataset.i, j = i + +b.dataset.d; [L[i], L[j]] = [L[j], L[i]]; draw(); });
       $$('[data-rm]').forEach(b => b.onclick = () => { if (confirmBox('Remove this slide?')) { H.slides.splice(+b.dataset.rm, 1); draw(); } });
       $$('[data-mv]').forEach(b => b.onclick = () => { const i = +b.dataset.mv, j = i + +b.dataset.d; [H.slides[i], H.slides[j]] = [H.slides[j], H.slides[i]]; draw(); });
       if ($('#hpAdd')) $('#hpAdd').onclick = () => { H.slides.push({ image: '', pos: 'center', kicker: '', title: 'New *slide*', text: '', button: 'Shop now', link: '/shop' }); draw(); };
       $('#hpSave').onclick = async () => {
         H.slides = H.slides.slice(0, 3);
+        H.wall = H.wall.filter(w => w.image); H.categories = H.categories.filter(c => (c.name || '').trim()); H.brands = H.brands.filter(b => (b.name || '').trim()); H.faq = H.faq.filter(q => (q.q || '').trim());
         try { await api('/api/admin/settings', { method: 'PUT', body: { home: JSON.stringify(H) } }); toast('Homepage saved 🎉'); draw(); }
         catch (e) { toast(e.message, 1); }
       };
@@ -550,6 +596,8 @@
         <div class="card card-pad"><h3>Store</h3>
           <label class="field"><span>WhatsApp number <small>(country code, no + or spaces, e.g. 96170123456)</small></span><input class="input" name="whatsapp" value="${esc(s.whatsapp)}" inputmode="numeric"></label>
           <label class="field"><span>Instagram link</span><input class="input" name="instagram" value="${esc(s.instagram)}"></label>
+          <label class="field"><span>Store address <small>(shown on the homepage, in the footer and on directions — leave empty to hide)</small></span><input class="input" name="store_address" value="${esc(s.store_address || '')}" placeholder="Ste. Takla Centre, Wadi Chahrour El Soufla, Main Road"></label>
+          <label class="field"><span>Opening hours <small>(optional, e.g. Mon–Sat 10:00–21:00)</small></span><input class="input" name="store_hours" value="${esc(s.store_hours || '')}"></label>
           <label class="field"><span>Announcement bar <small>(green strip at the top — leave empty to hide)</small></span><input class="input" name="announcement" value="${esc(s.announcement)}"></label>
           <label class="toggle"><div><b>Welcome popup</b><small>Invite visitors to join when they arrive (they can skip and browse)</small></div><span class="switch"><input type="checkbox" name="welcome_popup" ${s.welcome_popup === '1' ? 'checked' : ''}><i></i></span></label>
           <label class="toggle"><div><b>Ask for details before shopping</b><small>Name, family name, email, country &amp; phone required before add to bag, checkout or WhatsApp enquiries</small></div><span class="switch"><input type="checkbox" name="require_signup" ${s.require_signup !== '0' ? 'checked' : ''}><i></i></span></label>

@@ -10,8 +10,8 @@
   const timers = new Set();
 
   const BRAND_LOGOS = { nike: '/brand/brand-nike.png', adidas: '/brand/brand-adidas.png', on: '/brand/brand-on.png', 'the north face': '/brand/brand-tnf.png' };
-  const BRANDS = ['Nike', 'Adidas', 'On', 'The North Face'];
-  const brandLogo = b => BRAND_LOGOS[String(b || '').toLowerCase()] || '/brand/emblem.png';
+  // a logo uploaded in the admin wins over the built-in ones
+  const brandLogo = b => { const k = String(b || '').toLowerCase(); const hb = (HOME.brands || []).find(x => (x.name || '').toLowerCase() === k); return (hb && hb.logo) || BRAND_LOGOS[k] || '/brand/emblem.png'; };
   const money = n => `${S.currency || '$'}${Number(n || 0).toFixed(Number(n) % 1 ? 2 : 0)}`;
   const priceOf = p => p.sale_price ?? p.price;
 
@@ -196,6 +196,7 @@
   function render() {
     timers.forEach(t => clearInterval(t)); timers.clear();
     if (window.FX) FX.leave();
+    const cf = $('.cat-float'); if (cf) cf.classList.remove('on');
     const path = here(), q = new URLSearchParams(location.search);
     $$('.nav > a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === path + location.search));
     if (path === '/') renderHome();
@@ -210,24 +211,27 @@
   }
 
   // ---------- home ----------
-  // Campaign photography (official brand imagery, see campaign/SOURCES.md). Anything the owner sets
-  // in Admin → Homepage replaces these; the old placeholder photos count as "not set".
+  // Campaign photography (see campaign/SOURCES.md) and the shop's own photos (instore/). Everything the owner
+  // sets in Admin → Homepage replaces these defaults; the very first placeholder photos count as "not set".
   const C = n => `/campaign/${n}.webp`, Cs = n => `/campaign/${n}-sm.webp`;
   const OLD_DEFAULTS = /images\.unsplash\.com\/photo-(1574680088814|1552674605|1608748180154|1726195222023|1511746315387|1718248028293|1618329918461|1556705634|1784924176852|1541534741688)/;
   const own = (url, fallback) => url && !OLD_DEFAULTS.test(url) ? src(url, 1800) : fallback;
   const BRAND_ART = { nike: 'nike-vest', adidas: 'adidas-studio', on: 'on-jump', 'the north face': 'tnf-orange' };
   const BRAND_BANNER = { nike: 'nike-sprint', adidas: 'adidas-gym', on: 'on-runner', 'the north face': 'tnf-shell' };
   const BRAND_NAME = { nike: 'Nike', adidas: 'adidas', on: 'On', 'the north face': 'The North Face' };
-  const SPORTS = [
-    { name: 'Running', img: 'nike-run-group', link: '/shop?category=Shorts' },
-    { name: 'Training', img: 'adidas-gym', link: '/shop?category=Tracksuits' },
-    { name: 'Outdoor', img: 'tnf-puffer', link: '/shop?brand=The%20North%20Face' },
-    { name: 'Lifestyle', img: 'on-lifestyle', link: '/shop' },
-  ];
+  const CAT_ART = { tracksuits: 'nike-run-pair', shorts: 'nike-run-group', jackets: 'tnf-red', tops: 'nike-iridescent', hoodies: 'tnf-hoodie', leggings: 'adidas-squat' };
   const BANNERS = ['nike-trail-run', 'tnf-summit'];
-  // transparent cutouts of the shop's own photos: these stand on the 3D stage
+  const MAP = a => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`THREADS Activewear ${a || 'Wadi Chahrour'} Lebanon`)}`;
+  // transparent cutouts of the shop's own photos: these stand on the 3D stand
   const CUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
   const cutOf = p => p.cutout || CUTS[p.sku] || '';
+
+  const HOME_DEFAULTS = window.HOME_DEFAULTS || {};
+  const H = k => (HOME[k] != null && (!Array.isArray(HOME[k]) || HOME[k].length)) ? HOME[k] : HOME_DEFAULTS[k];
+  const on = k => ({ ...HOME_DEFAULTS.sections, ...(HOME.sections || {}) })[k] !== false;
+  const brandNames = () => (H('brands') || []).map(b => b.name).filter(Boolean);
+  const categoryList = () => (H('categories') || []).filter(c => c.name);
+
   const STEPS = ['Order', 'Confirm', 'Deliver', 'Pay'];
   const STEP_TEXT = (fee, freeOver) => [
     'Pick your size and order in a minute. No account, no card.',
@@ -237,27 +241,35 @@
   ];
   const pic = (name, alt = '', sizes = '100vw', lazy = true) => `<img src="${C(name)}" srcset="${Cs(name)} 900w, ${C(name)} 1800w" sizes="${sizes}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
   const ownPic = (url, name, sizes) => url && !OLD_DEFAULTS.test(url) ? `<img src="${esc(src(url, 1600))}" ${srcset(url, [800, 1200, 1800])} sizes="${sizes}" alt="" loading="lazy">` : pic(name, '', sizes);
-  const logoRow = () => BRANDS.map(b => `<a href="/shop?brand=${encodeURIComponent(b)}" data-link><img src="${brandLogo(b)}" alt="${esc(b)}"></a>`).join('');
+  const logoRow = () => brandNames().map(b => `<a href="/shop?brand=${encodeURIComponent(b)}" data-link><img src="${brandLogo(b)}" alt="${esc(b)}"></a>`).join('');
+  // {fee} {free} {cities} {address} in FAQ answers are filled in from the settings
+  const fill = t => esc(t)
+    .replace(/\{fee\}/g, money(Number(S.delivery_fee) || 0))
+    .replace(/\{free\}/g, Number(S.free_delivery_over) ? `, and free when your order is over ${money(S.free_delivery_over)}` : '')
+    .replace(/\{cities\}/g, esc((S.cities || '').split(',').map(c => c.trim()).filter(Boolean).slice(0, 8).join(', ')))
+    .replace(/\{address\}/g, esc(S.store_address || 'our store'));
+  const E_BARS = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 0h70l-9 22H21z"/><path class="mid" d="M18 39h70l-9 22H9z"/><path d="M6 78h70l-9 22H-3z"/></svg>';
 
   function renderHome() {
     document.title = 'THREADS — Activewear & Lifestyle';
     const groups = groupsOf(PRODUCTS);
     const freeOver = Number(S.free_delivery_over) || 0;
     const fee = Number(S.delivery_fee) || 0;
-    const cities = (S.cities || '').split(',').map(c => c.trim()).filter(Boolean).slice(0, 8).join(', ');
     const slides = HOME.slides || [];
     const lead = slides[0] || {};
     const stage = PRODUCTS.filter(cutOf).map(p => ({ p, cut: cutOf(p) }));
     const live = [...groups].sort((a, b) => b.length - a.length)[0] || [];
     const newIn = [...groups].sort((a, b) => b.some(p => p.featured) - a.some(p => p.featured) || new Date(b[0].created_at) - new Date(a[0].created_at) || b.length - a.length);
-    const tiles = (HOME.brands || []).length ? HOME.brands : BRANDS.map(name => ({ name }));
+    const tiles = H('brands') || brandNames().map(name => ({ name }));
     const inBrand = b => PRODUCTS.filter(p => p.brand.toLowerCase() === b.toLowerCase()).length;
-    const tickerBits = String(HOME.ticker || 'Cash on delivery · 100% original · Delivery all over Lebanon').split('·').map(t => t.trim()).filter(Boolean);
+    const inCat = c => PRODUCTS.filter(p => (p.category || '').toLowerCase() === c.toLowerCase()).length;
+    const cats = categoryList().filter(c => inCat(c.name));
+    const tickerBits = String(HOME.ticker || '100% original · Cash on delivery · Delivery all over Lebanon').split('·').map(t => t.trim()).filter(Boolean);
     const tickerRun = `<span>${tickerBits.map(t => `${esc(t)}<i></i>`).join('')}</span>`.repeat(3);
-    const banner = (sl, i) => sl && (sl.title || sl.text) ? `<section class="banner">
+    const banner = (sl, i) => sl && (sl.title || sl.text) ? `<section class="banner${i ? ' banner-r' : ''}">
         ${ownPic(sl.image, BANNERS[i], '100vw')}
         <div class="banner-copy">
-          ${sl.kicker ? `<p class="hero-kicker">${esc(sl.kicker)}</p>` : ''}
+          ${sl.kicker ? `<p class="banner-kicker">${esc(sl.kicker)}</p>` : ''}
           ${sl.title ? `<h2>${rich(sl.title)}</h2>` : ''}
           ${sl.text ? `<p>${esc(sl.text)}</p>` : ''}
           <div class="cta-row">
@@ -267,6 +279,9 @@
         </div>
       </section>` : '';
     const words = STEP_TEXT(fee, freeOver);
+    const wall = H('wall').filter(w => w.image);
+    const promises = H('promises').slice(0, 3);
+    const outline = t => `<span class="outline" aria-hidden="true">${esc(t)}</span>`;
 
     app.innerHTML = `
       <section class="hero" id="hero">
@@ -275,7 +290,7 @@
         <div class="hero-copy">
           <p class="hero-kicker">${esc(lead.kicker || 'Activewear & lifestyle · Lebanon')}</p>
           <h1>${lead.title ? rich(lead.title) : 'Move your <em>way.</em>'}</h1>
-          <p class="hero-sub">${esc(lead.text || 'Original Nike, Adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.')}</p>
+          <p class="hero-sub">${esc(lead.text || 'Original Nike, adidas, On and The North Face, delivered anywhere in Lebanon. You pay cash at the door.')}</p>
           <div class="cta-row">
             <a class="btn btn-green" href="${esc(lead.link || '/shop?gender=Women')}" data-link>${esc(lead.button || 'Shop women')}</a>
             <a class="btn btn-ghost-d" href="${esc(lead.link2 || '/shop?gender=Men')}" data-link>${esc(lead.button2 || 'Shop men')}</a>
@@ -300,24 +315,46 @@
       <div class="ticker"><p class="sr-only">${esc(tickerBits.join(', '))}</p><div class="ticker-run" aria-hidden="true">${tickerRun}${tickerRun}</div></div>
 
       <section class="duo" aria-label="Shop women and men">
-        ${[['Women', HOME.women_image, 'adidas-squat'], ['Men', HOME.men_image, 'nike-run-man']].map(([g, url, art]) => `<a class="duo-tile" href="/shop?gender=${g}" data-link>
+        ${[['Women', HOME.women_image, 'adidas-squat'], ['Men', HOME.men_image, 'nike-run-man']].map(([g, url, art]) => `<a class="duo-tile" href="/shop?gender=${g}" data-link data-cursor="Shop">
           ${ownPic(url, art, '(max-width: 640px) 100vw, 50vw')}
-          <span class="duo-label"><b>${g}</b><span class="btn btn-white">Shop ${g.toLowerCase()}</span></span>
+          <span class="duo-label"><b>${g}</b><span class="duo-n">${PRODUCTS.filter(p => p.gender === g || p.gender === 'Unisex').length} pieces</span></span>
         </a>`).join('')}
       </section>
 
       <section class="rail-sec">
-        <div class="sec-row"><h2 class="h-sec">New in</h2><a class="link" href="/shop" data-link>View all</a></div>
+        <div class="sec-row"><div><h2 class="h-sec">Just landed</h2><p class="sec-sub">Fresh on the wall this week.</p></div><a class="link" href="/shop" data-link>Shop all</a></div>
         <div class="rail" id="rail">${newIn.map(v => card(v)).join('')}</div>
         <div class="rail-btns"><button type="button" class="icon-btn" data-rail="-1" aria-label="Scroll left"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" class="icon-btn" data-rail="1" aria-label="Scroll right"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
       </section>
 
-      ${banner(slides[1], 0)}
+      ${on('promises') && promises.length ? `<section class="promises" id="promises" aria-label="The THREADS promise">
+        <div class="promises-stage">
+          <div class="promises-gl" aria-hidden="true"><span class="promises-flat">${E_BARS}</span></div>
+          <p class="promises-kick">${outline('THREADS')}</p>
+          <ol class="promises-list">${promises.map((p, i) => `<li data-step="${i}"><b>${esc(p.title)}</b><span>${esc(p.text)}</span></li>`).join('')}</ol>
+        </div>
+      </section>` : ''}
 
-      <section class="brand-sec">
-        <div class="sec-row"><h2 class="h-sec">Shop by brand</h2></div>
+      ${on('wall') && wall.length ? `<section class="wall-sec">
+        <div class="wall-back" aria-hidden="true">${outline('On the wall · On the wall · On the wall ·')}</div>
+        <div class="sec-row"><div><h2 class="h-sec">On the wall right now</h2><p class="sec-sub">Photographed in the shop in Wadi Chahrour. Tap one to shop it.</p></div><a class="link" href="${esc(S.instagram || '#')}" target="_blank" rel="noopener">@threadsactivewear</a></div>
+        <div class="wall" id="wall" data-cursor="Drag">${wall.map(w => { const p = w.sku && PRODUCTS.find(x => x.sku === w.sku); const href = p ? `/p/${p.slug}` : (w.link || S.instagram || '#'); const ext = !p && /^https?:/.test(href); return `<a class="wall-item" href="${esc(href)}" ${ext ? 'target="_blank" rel="noopener"' : 'data-link'}><img src="${esc(own(w.image, w.image))}" alt="${esc(p ? `${p.brand} ${p.name}` : w.caption || '')}" loading="lazy" draggable="false"><span class="wall-cap">${esc(w.caption || (p ? p.name : ''))}</span><span class="wall-go">${p ? money(priceOf(p)) : 'Ask on Instagram'}</span></a>`; }).join('')}</div>
+      </section>` : ''}
+
+      ${on('banner1') ? banner(slides[1], 0) : ''}
+
+      ${on('categories') && cats.length ? `<section class="cat-sec">
+        <div class="sec-row"><div><h2 class="h-sec">Shop by category</h2><p class="sec-sub">Point at one to see what is in it.</p></div></div>
+        <ol class="cat-index">${cats.map((c, i) => `<li><a href="/shop?category=${encodeURIComponent(c.name)}" data-link data-img="${esc(own(c.image, C(CAT_ART[c.name.toLowerCase()] || 'nike-trail-run')))}">
+          <span class="cat-i tnum">${String(i + 1).padStart(2, '0')}</span><span class="cat-name">${esc(c.name)}</span><span class="cat-n tnum">${inCat(c.name)}</span>
+          <img class="cat-thumb" src="${esc(own(c.image, Cs(CAT_ART[c.name.toLowerCase()] || 'nike-trail-run')))}" alt="" loading="lazy">
+        </a></li>`).join('')}</ol>
+      </section>` : ''}
+
+      ${on('brands') ? `<section class="brand-sec">
+        <div class="sec-row"><div><h2 class="h-sec">Four brands, all original</h2><p class="sec-sub">Straight from the brands. Never a copy.</p></div></div>
         <div class="brand-grid">
-          ${tiles.map(b => `<a class="brand-tile" href="/shop?brand=${encodeURIComponent(b.name)}" data-link>
+          ${tiles.map(b => `<a class="brand-tile" href="/shop?brand=${encodeURIComponent(b.name)}" data-link data-cursor="Shop">
             ${ownPic(b.image, BRAND_ART[b.name.toLowerCase()] || 'nike-vest', '(max-width: 640px) 50vw, 25vw')}
             <span class="brand-tile-in">
               <img class="brand-tile-logo" src="${brandLogo(b.name)}" alt="${esc(b.name)}">
@@ -326,55 +363,65 @@
             </span>
           </a>`).join('')}
         </div>
-      </section>
+      </section>` : ''}
 
-      ${live.length > 1 ? `<section class="pick" id="live">
+      ${on('pick') && live.length > 1 ? `<section class="pick" id="live">
         <div class="pick-photo live-photo">${live.map((p, i) => `<img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name} in ${p.color}`)}" data-v="${i}" class="${i ? 'out' : ''}" loading="lazy">`).join('')}</div>
         <div class="pick-info">
-          <p class="hero-kicker">${esc(live[0].brand)} · ${live.length} colours</p>
+          <p class="pick-count">${live.length} colours</p>
           <h2 class="h-sec">${esc(live[0].name).replace(/-/g, '‑')}</h2>
           <div class="live-price tnum" id="livePrice"></div>
           <div class="swatch-row" role="group" aria-label="Colour">${live.map((p, i) => `<button type="button" class="swatch" style="--c:${esc(hexOf(p))}" data-v="${i}" aria-pressed="${i === 0}" aria-label="${esc(p.color)}"></button>`).join('')}</div>
           <p class="live-colour" id="liveColour"></p>
           <div class="live-sizes" id="liveSizes" role="group" aria-label="Size"></div>
           <p class="live-note" id="liveNote" aria-live="polite"></p>
+          <p class="pick-copy">The 2-in-1 that runs, trains and goes for coffee after. Light shell outside, liner inside.</p>
           <div class="cta-row"><button class="btn btn-green" id="liveAdd">Add to bag</button><a class="link" id="liveLink" data-link>Full details</a></div>
         </div>
       </section>` : ''}
 
-      <section class="sport-sec">
-        <div class="sec-row"><h2 class="h-sec">Shop by sport</h2></div>
-        <div class="sport-grid">${SPORTS.map(s => `<a class="sport-tile" href="${s.link}" data-link>${pic(s.img, '', '(max-width: 640px) 50vw, 25vw')}<span>${s.name}</span></a>`).join('')}</div>
-      </section>
+      ${on('banner2') ? banner(slides[2], 1) : ''}
 
-      ${banner(slides[2], 1)}
+      ${on('how') ? `<section class="how" aria-label="How ordering works">
+        <div class="sec-row"><div><h2 class="h-sec">Cash on delivery, all over Lebanon</h2><p class="sec-sub">No card, no account. Four steps and it is yours.</p></div></div>
+        <ol class="how-steps">${STEPS.map((s, i) => `<li><b class="tnum">${i + 1}</b><h3>${s}</h3><p>${words[i]}</p></li>`).join('')}</ol>
+      </section>` : ''}
 
-      <section class="how" aria-label="How ordering works">
-        <div class="sec-row"><h2 class="h-sec">Cash on delivery. <em>All over Lebanon.</em></h2></div>
-        <ol class="how-steps">${STEPS.map((s, i) => `<li><b class="tnum">0${i + 1}</b><h3>${s}</h3><p>${words[i]}</p></li>`).join('')}</ol>
-      </section>
-
-      <section class="faq">
-        <h2 class="h-sec">Questions</h2>
-        <div class="faq-list">
-          <details><summary>How do I pay?</summary><p>In cash, when the order reaches you. You never enter a card on this site.</p></details>
-          <details><summary>How much is delivery, and where do you deliver?</summary><p>${money(fee)} anywhere in Lebanon${freeOver ? `, and free when your order is over ${money(freeOver)}` : ''}. We deliver to ${esc(cities)} and the rest of the country.</p></details>
-          <details><summary>What happens after I order?</summary><p>We message you on WhatsApp to confirm the order and your address, then our driver brings it to you.</p></details>
-          <details><summary>What if the size is wrong?</summary><p>Message us on WhatsApp within a few days of delivery. If the piece is unworn with its tags on, we swap the size.</p></details>
-          <details><summary>Are the products original?</summary><p>Yes. Everything we sell is original Nike, Adidas, On and The North Face.</p></details>
-          <details><summary>Can I order on WhatsApp instead?</summary><p>Yes. Send us the product name and your size on <a class="link" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a> and we take it from there.</p></details>
+      ${on('visit') && S.store_address ? `<section class="visit">
+        <div class="visit-copy">
+          <h2 class="h-sec">Come try it on</h2>
+          <p>Feel the fabric, find your size and leave with your fit. Everything on the site is on the wall in Wadi Chahrour.</p>
+          <address>THREADS Activewear &amp; Lifestyle<br>${esc(S.store_address)}${S.store_hours ? `<br><span>${esc(S.store_hours)}</span>` : ''}</address>
+          <div class="cta-row">
+            <a class="btn btn-green" href="${MAP(S.store_address)}" target="_blank" rel="noopener">Get directions</a>
+            <a class="btn btn-ghost-d" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">Message us</a>
+          </div>
         </div>
-      </section>
+        <div class="visit-photos" aria-hidden="true">${wall.slice(3, 6).map(w => `<img src="${esc(own(w.image, w.image))}" alt="" loading="lazy">`).join('')}</div>
+      </section>` : ''}
 
-      <section class="ig">
-        <img src="/brand/logo-circle.jpg" alt="" loading="lazy">
-        <div><h2 class="h-sec">Join the crew</h2><p>New drops, restocks and styling, first on Instagram.</p></div>
-        <a class="btn btn-green" href="${esc(S.instagram || '#')}" target="_blank" rel="noopener">Follow @threadsactivewear</a>
-      </section>`;
+      ${on('faq') ? `<section class="faq">
+        <div><h2 class="h-sec">Good questions</h2><p class="sec-sub">Anything else? <a class="link" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">Ask us on WhatsApp.</a></p></div>
+        <div class="faq-list">${H('faq').filter(f => f.q && (f.a || '').trim()).filter(f => S.store_address || !/\{address\}/.test(f.a)).map(f => `<details><summary>${esc(f.q)}</summary><p>${fill(f.a)}</p></details>`).join('')}</div>
+      </section>` : ''}`;
 
     wireStand(stage);
     wireLive(live);
     wireRail();
+    wireCats();
+  }
+
+  // the category index: the photo follows the pointer over the list
+  function wireCats() {
+    const list = $('.cat-index'); if (!list || !matchMedia('(hover: hover)').matches) return;
+    let float = $('.cat-float');
+    if (!float) { float = document.createElement('div'); float.className = 'cat-float'; float.innerHTML = '<img alt="">'; document.body.appendChild(float); }
+    const img = float.firstChild;
+    $$('a', list).forEach(a => {
+      a.addEventListener('mouseenter', () => { img.src = a.dataset.img; float.classList.add('on'); });
+      a.addEventListener('mouseleave', () => float.classList.remove('on'));
+    });
+    list.addEventListener('mousemove', e => { float.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`; });
   }
 
   // the 3D stand: caption, arrows and dragging; FX does the drawing
@@ -452,18 +499,21 @@
 
     const pool = PRODUCTS.filter(p => (!gender || p.gender === gender || p.gender === 'Unisex') && (!brand || p.brand.toLowerCase() === brand.toLowerCase()));
     const cats = [...new Set(pool.map(p => p.category).filter(Boolean))].sort();
-    const brandList = [...new Set([...BRANDS, ...PRODUCTS.map(p => p.brand).filter(Boolean)])];
+    const brandList = [...new Set([...brandNames(), ...PRODUCTS.map(p => p.brand).filter(Boolean)])];
     const title = term ? `“${q.get('q')}”` : cat || (sale ? 'Sale' : brand || (gender || 'Shop all'));
-    const bt = (HOME.brands || []).find(b => b.name.toLowerCase() === brand.toLowerCase());
-    const bg = bt ? bt.image : gender === 'Men' ? HOME.men_image : gender === 'Women' ? HOME.women_image : (HOME.story || {}).image;
+    const bkey = brand.toLowerCase(), bname = BRAND_NAME[bkey] || brand;
+    const bt = (HOME.brands || []).find(b => b.name.toLowerCase() === bkey);
+    const art = term ? '' : brand ? own(bt && bt.image, C(BRAND_BANNER[bkey] || 'nike-trail-run')) : gender === 'Women' ? own(HOME.women_image, C('adidas-squat')) : gender === 'Men' ? own(HOME.men_image, C('nike-run-man')) : cat === 'Shorts' ? C('nike-run-group') : cat ? C('tnf-puffer') : C('nike-trail-run');
+    const line = term ? '' : brand ? `Original ${bname}, delivered anywhere in Lebanon or waiting for you in store.` : sale ? 'Original pieces at lower prices, while sizes last.' : gender === 'Women' ? 'Sets, shorts and layers for training, running and everyday.' : gender === 'Men' ? 'Tracksuits, layers and running gear for every day you move.' : cat ? `Every ${esc(cat.toLowerCase())} on the wall right now.` : 'Everything on the wall right now, from four brands we trust.';
     document.title = `${title} — THREADS`;
     const link = patch => { const n = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) v ? n.set(k, v) : n.delete(k); return '/shop' + (n.toString() ? '?' + n : ''); };
     const cols = load('th_cols', 4);
 
     app.innerHTML = `
-      <section class="shop-head"><div class="wrap">
-        ${brand && !cat && !term ? `<img src="${brandLogo(brand)}" alt="${esc(brand)}" style="height:clamp(40px,6vw,70px);width:auto;margin-bottom:10px;filter:invert(1)">` : ''}
-        <h1 class="display split-me">${esc(title)}</h1>
+      <section class="shop-head${art ? ' has-art' : ''}">${art ? `<img class="shop-art" src="${art}" alt="">` : ''}<div class="wrap">
+        ${brand && !cat && !term ? `<img class="shop-logo" src="${brandLogo(brand)}" alt="${esc(bname)}">` : ''}
+        <h1 class="display">${esc(brand && !cat && !term ? bname : title)}</h1>
+        ${line ? `<p class="shop-line">${line}</p>` : ''}
         <div class="count">${groups.length} style${groups.length === 1 ? '' : 's'} in ${list.length} colour${list.length === 1 ? '' : 's'}</div>
         <div class="chips">
           ${['', 'Women', 'Men'].map(g => `<a class="chip ${gender === g ? 'on' : ''}" href="${link({ gender: g, category: '' })}" data-link>${g || 'Everyone'}</a>`).join('')}
@@ -483,7 +533,7 @@
           </select>
         </div>
         ${groups.length ? `<div class="grid shop-grid" id="shopGrid" style="--cols:${cols}">${groups.map(g => card(g)).join('')}</div>` :
-          `<div class="empty"><h3>${gender === 'Men' && !brand && !cat ? "Men's drop landing soon" : 'Nothing here yet'}</h3><p>${gender === 'Men' && !brand && !cat ? 'New pieces are on the way. Follow us on Instagram to be first.' : 'Try another filter.'}</p><a href="/shop" data-link class="btn btn-dark">See everything</a></div>`}
+          `<div class="empty"><h3>${gender === 'Men' && !brand && !cat ? "Men's drop landing soon" : 'Nothing here yet'}</h3><p>${gender === 'Men' && !brand && !cat ? 'New pieces are on the way. Follow us on Instagram to see them first.' : brand ? `${esc(bname)} is coming to THREADS soon. Message us on WhatsApp and we will tell you when it lands.` : 'Try another filter.'}</p><a href="/shop" data-link class="btn btn-dark">See everything</a></div>`}
       </div>`;
     $('#fBrand').onchange = e => go(link({ brand: e.target.value }), true);
     $$('[data-cols]').forEach(b => b.onclick = () => { const n = +b.dataset.cols; save('th_cols', n); $('#shopGrid') && $('#shopGrid').style.setProperty('--cols', n); $$('[data-cols]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); });
@@ -824,7 +874,7 @@
     t = t.trim().toLowerCase();
     if (!t) {
       const cats = [...new Set(PRODUCTS.map(p => p.category).filter(Boolean))];
-      $('#searchRes').innerHTML = `<div class="search-hint">Popular: ${[...BRANDS, ...cats].map(x => `<button type="button" data-s="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
+      $('#searchRes').innerHTML = `<div class="search-hint">Popular: ${[...brandNames(), ...cats].map(x => `<button type="button" data-s="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
       $$('[data-s]').forEach(b => b.onclick = () => { $('#searchInput').value = b.dataset.s; drawSearch(b.dataset.s); });
       return;
     }
@@ -936,8 +986,17 @@
     const wa = `https://wa.me/${S.whatsapp}`;
     ['#footWa', '#footWaBtn', '#mmWa'].forEach(s => $(s).href = wa);
     $('#footIg').href = S.instagram || '#';
-    const tiles = (HOME.brands || []).length ? HOME.brands : BRANDS.map(name => ({ name }));
-    const tileHtml = b => `<a href="/shop?brand=${encodeURIComponent(b.name)}" data-link>${b.image ? `<img class="bg" src="${esc(src(b.image, 400))}" alt="" loading="lazy">` : ''}<img class="lg" src="${brandLogo(b.name)}" alt="${esc(b.name)}"></a>`;
+    const addr = S.store_address || '';
+    ['#footMap', '#footMapBtn'].forEach(id => { $(id).href = MAP(addr); $(id).hidden = !addr; });
+    $('#fAddress').innerHTML = addr ? `THREADS Activewear &amp; Lifestyle<br>${esc(addr)}${S.store_hours ? `<br>${esc(S.store_hours)}` : ''}` : '';
+    const catLinks = categoryList().filter(c => PRODUCTS.some(p => (p.category || '').toLowerCase() === c.name.toLowerCase()));
+    const catA = c => `<a href="/shop?category=${encodeURIComponent(c.name)}" data-link>${esc(c.name)}</a>`;
+    $('#fCats').innerHTML = catLinks.map(catA).join('');
+    $('#ddCats').innerHTML = catLinks.map(c => `<a href="/shop?category=${encodeURIComponent(c.name)}" data-link><b>${esc(c.name)}</b><small>${PRODUCTS.filter(p => (p.category || '').toLowerCase() === c.name.toLowerCase()).length} pieces</small></a>`).join('') + '<a href="/shop" data-link><b>Shop all</b><small>Everything in store</small></a>';
+    $('#mmenuCats').innerHTML = catLinks.map(catA).join('');
+    $('#fBrands').innerHTML = H('brands').map(b => `<a href="/shop?brand=${encodeURIComponent(b.name)}" data-link>${esc(BRAND_NAME[b.name.toLowerCase()] || b.name)}</a>`).join('');
+    const tiles = H('brands');
+    const tileHtml = b => `<a href="/shop?brand=${encodeURIComponent(b.name)}" data-link><img class="bg" src="${esc(own(b.image, Cs(BRAND_ART[b.name.toLowerCase()] || 'nike-vest')))}" alt="" loading="lazy"><img class="lg" src="${brandLogo(b.name)}" alt="${esc(b.name)}"></a>`;
     $('#ddBrands').innerHTML = tiles.map(tileHtml).join('');
     $('#mmenuBrands').innerHTML = tiles.map(tileHtml).join('');
     cart = cart.filter(l => PRODUCTS.some(p => p.id === l.id));
