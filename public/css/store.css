@@ -140,7 +140,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 .hero-kicker { font: 600 var(--step-small)/1.2 var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
 
 /* ---------- hero: the 3D stand ---------- */
-.hero { position: relative; height: calc(100svh - var(--head-h)); min-height: 600px; overflow: hidden; isolation: isolate; background: #050505; touch-action: pan-y; }
+.hero { position: relative; height: calc(100svh - var(--head-h) - var(--announce-h, 36px)); min-height: 600px; overflow: hidden; isolation: isolate; background: #050505; touch-action: pan-y; }
 .hero::before { content: ""; position: absolute; inset: 0; z-index: -2; background: radial-gradient(60% 70% at 72% 62%, rgba(57, 255, 20, .14), transparent 70%), radial-gradient(40% 40% at 15% 20%, rgba(255, 255, 255, .05), transparent 70%); }
 .hero::after { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 30%; z-index: -1; background: linear-gradient(transparent, rgba(0, 0, 0, .7)); pointer-events: none; }
 .hero-gl { position: absolute; inset: 0; z-index: -1; cursor: grab; }
@@ -179,6 +179,16 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 .stand-count b { color: #fff; font-weight: 600; }
 .stand-hint { position: absolute; right: 0; bottom: calc(100% + 14px); margin: 0; font-size: var(--step-small); color: #8a8a8a; white-space: nowrap; }
 .hero:not(.ready) .stand-hint { display: none; }
+/* the caption sits centred under the plinth: the brand, a link to it, the stock, then the controls */
+.hero-stand { left: 50%; right: 0; bottom: clamp(18px, 3.2vh, 34px); flex-direction: column; align-items: center; gap: 14px; text-align: center; pointer-events: none; }
+.hero-stand a, .hero-stand button { pointer-events: auto; }
+.stand-cap { text-align: center; justify-items: center; gap: 4px; }
+.stand-brand { letter-spacing: .2em; color: var(--accent); font-weight: 600; }
+.stand-name { font-size: clamp(1.6rem, 1rem + 1.4vw, 2.4rem); }
+.stand-price { color: #bdbdbd; }
+.stand-nav { gap: 10px; }
+.stand-hint { display: none; }   /* the cursor says Drag on desktop; phones swipe */
+.hero-gl::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26%; background: linear-gradient(transparent, rgba(5, 5, 5, .85)); pointer-events: none; } /* taste-skill-ignore: scrim under the caption */
 
 /* ---------- the ticker: green band, runs faster while you scroll ---------- */
 .ticker { background: var(--accent); color: #000; overflow: hidden; position: relative; z-index: 2; }
@@ -500,15 +510,16 @@ html.th-intro .intro.done { animation: curtain .8s cubic-bezier(.7, 0, .2, 1) fo
   .hero-sub { font-size: var(--step-body); max-width: 32ch; }
   .hero-brands { display: none; }
   .hero-flat { right: 50%; transform: translateX(50%); height: 46%; bottom: 14%; }
-  .hero-stand { left: var(--m); justify-content: space-between; }
-  .stand-cap { text-align: left; }
-  .stand-hint { left: 0; right: auto; }
+  .hero-stand { left: var(--m); right: var(--m); gap: 8px; bottom: 14px; }
+  .stand-brand { display: none; }
+  .stand-name { font-size: 1.5rem; }
+  .stand-nav .icon-btn { width: 36px; height: 36px; }
   .brand-grid, .sport-grid { grid-template-columns: 1fr 1fr; }
   .how-steps { grid-template-columns: 1fr 1fr; }
   .pick { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-  .hero { min-height: 640px; }
+  .hero { min-height: 640px; --announce-h: 54px; }   /* the green bar wraps to two lines on phones */
   .hero-copy { top: 6%; }
   .hero h1 { margin-bottom: 14px; }
   .hero-sub { margin-bottom: 18px; }
