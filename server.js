@@ -179,8 +179,9 @@ app.post('/api/orders', wrap(async (req, res) => {
 // ---------- admin API ----------
 app.post('/api/admin/login', wrap(async (req, res) => {
   if (rateLimit('login:' + req.ip, 10, 15 * 60e3)) return res.status(429).json({ error: 'Too many attempts. Wait 15 minutes.' });
-  const pw = String((req.body || {}).password || '');
-  const real = (await getSettings()).admin_password || '';
+  // copy-paste and phone keyboards add spaces around the password
+  const pw = String((req.body || {}).password || '').trim();
+  const real = ((await getSettings()).admin_password || '').trim();
   const a = crypto.createHash('sha256').update(pw).digest(), b = crypto.createHash('sha256').update(real).digest();
   if (!real || !crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Wrong password' });
   await setAuthCookie(res);
