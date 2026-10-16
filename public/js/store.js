@@ -77,10 +77,26 @@
   window.dataLayer = window.dataLayer || [];
   const CUR = () => ({ $: 'USD', '€': 'EUR', '£': 'GBP' })[S.currency] || 'USD';
   const gaItem = (p, size, qty = 1) => ({ item_id: p.sku, item_name: p.name, item_brand: p.brand, item_category: p.category, item_variant: [p.color, size].filter(Boolean).join(' / '), price: priceOf(p), quantity: qty });
+  // the same moments as Meta Pixel standard events (the pixel in index.html already counts the first page view)
+  const FB = { view_item: 'ViewContent', add_to_cart: 'AddToCart', begin_checkout: 'InitiateCheckout', purchase: 'Purchase', sign_up: 'CompleteRegistration' };
+  let firstView = true;
   function track(event, data) {
     try {
       if (data && data.ecommerce) window.dataLayer.push({ ecommerce: null });   // GA4: clear the previous ecommerce object
       window.dataLayer.push({ event, ...data });
+    } catch {}
+    try {
+      if (typeof window.fbq !== 'function') return;
+      if (event === 'page_view') { if (!firstView) window.fbq('track', 'PageView'); firstView = false; return; }
+      if (!FB[event]) return;
+      const e = data && data.ecommerce;
+      const params = e ? {
+        currency: e.currency, value: e.value, content_type: 'product',
+        content_ids: e.items.map(i => i.item_id), contents: e.items.map(i => ({ id: i.item_id, quantity: i.quantity, item_price: i.price })),
+        num_items: e.items.reduce((a, i) => a + i.quantity, 0),
+        ...(e.items.length === 1 ? { content_name: `${e.items[0].item_brand} ${e.items[0].item_name}`, content_category: e.items[0].item_category } : {}),
+      } : {};
+      if (event === 'purchase' && e) window.fbq('track', FB[event], params, { eventID: e.transaction_id }); else window.fbq('track', FB[event], params);
     } catch {}
   }
 
@@ -577,7 +593,7 @@
     const p = PRODUCTS.find(x => x.slug === slug);
     if (!p) { app.innerHTML = `<div class="wrap empty"><h3>Not available</h3><p>This product may have sold out or been removed.</p><a href="/shop" data-link class="btn btn-dark">Back to shop</a></div>`; return; }
     document.title = `${p.brand} ${p.name} — ${p.color} — THREADS`;
-    track('view_item', { ecommerce: { currency: CUR(), value: priceOf(p), items: [gaItem(p)] } });
+    setTimeout(() => track('view_item', { ecommerce: { currency: CUR(), value: priceOf(p), items: [gaItem(p)] } }));   // after this page's page_view
     const sibs = groupsOf(siblings(p))[0];
     let sel = p.sizes.length === 1 && p.sizes[0].stock > 0 ? p.sizes[0].size : null, qty = 1;
     const relatedGroups = groupsOf(PRODUCTS.filter(x => gkey(x) !== gkey(p) && (x.category === p.category || x.brand === p.brand || x.gender === p.gender))).slice(0, 8);
