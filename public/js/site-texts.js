@@ -113,6 +113,7 @@ window.SITE_TEXTS = [
     ['done.pay', 'Order placed: step 3', 'Pay cash at your door when it arrives.'],
     ['done.wa_hint', 'Order placed: WhatsApp line', 'Send us your order on WhatsApp and we confirm it faster.'],
     ['done.wa_btn', 'Order placed: WhatsApp button', 'Send order on WhatsApp'],
+    ['done.wa_opened', 'Order placed: after WhatsApp opened', "Your order is waiting in WhatsApp: press send so we can confirm it. WhatsApp didn't open? Tap the button below."],
   ] },
   { group: 'Welcome popup', items: [
     ['pop.pill', 'Small label', 'ACTIVEWEAR & LIFESTYLE'],

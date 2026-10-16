@@ -820,14 +820,26 @@
       const missing = [!f.name && 'your name', (f.phone || '').replace(/\D/g, '').length < 7 && 'a valid phone number', !f.city && 'your area', !f.address && 'your address'].filter(Boolean);
       if (missing.length) { $('#coErr').innerHTML = `<div class="form-err">Please add ${missing.join(', ')}.</div>`; window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
       const btn = $('#placeBtn'); btn.disabled = true; btn.textContent = 'Placing order…';
+      // the order also starts a WhatsApp chat with the shop. Browsers only allow a new tab during the customer's tap,
+      // so it opens now and is pointed at the order once the order is saved.
+      let waWin = null;
+      if (!STATIC && S.whatsapp) {
+        try {
+          waWin = window.open('', '_blank');
+          if (waWin) { waWin.opener = null; waWin.document.write('<title>WhatsApp</title><body style="background:#0a0a0a;color:#fff;font:600 18px system-ui;display:grid;place-items:center;height:100vh;margin:0">Opening WhatsApp…</body>'); }
+        } catch { waWin = null; }
+      }
       try {
         const o = await api('/api/orders', { method: 'POST', body: JSON.stringify({ customer: f, items: cart }) });
+        const order = { ...o, customer: f };
+        if (waWin && !waWin.closed) { waWin.location.href = orderWa(order); order.waOpened = true; }
         save('th_customer', { name: f.name, phone: f.phone, email: f.email, city: f.city, address: f.address });
-        save('th_last_order', { ...o, customer: f });
+        save('th_last_order', order);
         cart = []; save('th_cart', cart); updateBadge();
         PRODUCTS = await api('/api/products');
         go(`/order/${o.number}`, true);
       } catch (err) {
+        if (waWin) waWin.close();
         $('#coErr').innerHTML = `<div class="form-err">${esc(err.message)}</div>`;
         btn.disabled = false; btn.textContent = T('co.place', { total: money(total) });
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -849,21 +861,26 @@
     </div>`;
   }
 
+  // the whole order as a WhatsApp message to the shop
+  function orderWa(o) {
+    const c = o.customer || {};
+    const text = [
+      `New order ${o.number}`,
+      ...(o.items || []).map(i => `${i.qty} x ${i.brand ? i.brand + ' ' : ''}${i.name}${i.color ? ', ' + i.color : ''}, size ${i.size}: ${money(i.price * i.qty)}`),
+      `Delivery: ${o.delivery_fee ? money(o.delivery_fee) : 'free'}`,
+      `Total cash on delivery: ${money(o.total)}`,
+      `Name: ${c.name || ''}`, `Phone: ${c.phone || ''}`, `Area: ${c.city || ''}`, `Address: ${c.address || ''}`,
+      c.notes ? `Notes: ${c.notes}` : '',
+    ].filter(Boolean).join('\n');
+    return `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(text)}`;
+  }
+
   function renderDone(num) {
     setOver(false);
     const o = load('th_last_order', null);
     const mine = o && o.number === num;
     document.title = 'Order placed — THREADS';
-    // the whole order as a WhatsApp message to the shop, so the owner sees it on the phone straight away
-    const orderText = mine ? [
-      `New order ${num}`,
-      ...(o.items || []).map(i => `${i.qty} x ${i.brand ? i.brand + ' ' : ''}${i.name}${i.color ? ', ' + i.color : ''}, size ${i.size}: ${money(i.price * i.qty)}`),
-      `Delivery: ${o.delivery_fee ? money(o.delivery_fee) : 'free'}`,
-      `Total cash on delivery: ${money(o.total)}`, '',
-      `Name: ${o.customer.name}`, `Phone: ${o.customer.phone}`, `Area: ${o.customer.city || ''}`, `Address: ${o.customer.address || ''}`,
-      o.customer.notes ? `Notes: ${o.customer.notes}` : '',
-    ].filter(x => x !== '').join('\n') : `Hi THREADS! About my order ${num}`;
-    const wa = encodeURIComponent(orderText);
+    const waHref = mine ? orderWa(o) : `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(`Hi THREADS! About my order ${num}`)}`;
     if (mine && o.via === 'whatsapp') {
       app.innerHTML = `<div class="wrap done">
         <div class="done-badge">${ICON.check}</div>
@@ -886,9 +903,9 @@
         <li><b>${tx('home.step3_t')}</b>${tx('done.deliver')}</li>
         <li><b>${tx('home.step4_t')}</b>${tx('done.pay')}</li>
       </ol>
-      ${mine ? `<p class="done-wa-hint">${tx('done.wa_hint')}</p>` : ''}
+      ${mine ? `<p class="done-wa-hint">${tx(o.waOpened ? 'done.wa_opened' : 'done.wa_hint')}</p>` : ''}
       <div class="cta-row">
-        <a class="btn btn-green" target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${wa}">${ICON.wa} ${mine ? tx('done.wa_btn') : tx('home.visit_msg')}</a>
+        <a class="btn btn-green" target="_blank" rel="noopener" href="${esc(waHref)}">${ICON.wa} ${mine ? tx('done.wa_btn') : tx('home.visit_msg')}</a>
         <a class="btn btn-outline" href="/shop" data-link>Keep shopping</a>
       </div></div>`;
   }
