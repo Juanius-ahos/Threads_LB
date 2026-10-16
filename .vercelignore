@@ -1,0 +1,4 @@
+data/
+dist/
+models-preview/
+.env

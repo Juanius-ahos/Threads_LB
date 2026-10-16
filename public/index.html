@@ -31,14 +31,14 @@
       <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
-      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="/brand/logo-white.png" alt="THREADS Activewear & Lifestyle"></a>
+      <a href="/" class="logo" data-link aria-label="THREADS home"><img src="/brand/logo-white.png" alt="THREADS Activewear & Lifestyle" data-img="img.logo"></a>
       <nav class="nav" id="nav">
-        <a href="/shop?gender=Women" data-link>Women</a>
-        <a href="/shop?gender=Men" data-link>Men</a>
-        <div class="dd"><button type="button" aria-haspopup="true">Categories</button><div class="dd-panel dd-list" id="ddCats"></div></div>
-        <div class="dd"><button type="button" aria-haspopup="true">Brands</button><div class="dd-panel" id="ddBrands"></div></div>
-        <a href="/shop" data-link>Shop all</a>
-        <a href="/shop?sale=1" data-link class="nav-sale">Sale</a>
+        <a href="/shop?gender=Women" data-link data-t="nav.women">Women</a>
+        <a href="/shop?gender=Men" data-link data-t="nav.men">Men</a>
+        <div class="dd"><button type="button" aria-haspopup="true" data-t="nav.categories">Categories</button><div class="dd-panel dd-list" id="ddCats"></div></div>
+        <div class="dd"><button type="button" aria-haspopup="true" data-t="nav.brands">Brands</button><div class="dd-panel" id="ddBrands"></div></div>
+        <a href="/shop" data-link data-t="nav.all">Shop all</a>
+        <a href="/shop?sale=1" data-link class="nav-sale" data-t="nav.sale">Sale</a>
       </nav>
       <div class="top-actions">
         <button class="icon-btn" id="searchBtn" aria-label="Search">
@@ -57,9 +57,9 @@
   <footer class="footer">
     <div class="f-top">
       <div class="f-invite">
-        <h2>Not sure of your size?</h2>
-        <p class="f-sub">Message us on WhatsApp, or come try it on at the store.</p>
-        <div class="cta-row"><a class="btn btn-green" id="footWaBtn" target="_blank" rel="noopener">Message us on WhatsApp</a><a class="btn btn-ghost-d" id="footMapBtn" target="_blank" rel="noopener">Get directions</a></div>
+        <h2 data-t="foot.title">Not sure of your size?</h2>
+        <p class="f-sub" data-t="foot.sub">Message us on WhatsApp, or come try it on at the store.</p>
+        <div class="cta-row"><a class="btn btn-green" id="footWaBtn" target="_blank" rel="noopener" data-t="foot.wa">Message us on WhatsApp</a><a class="btn btn-ghost-d" id="footMapBtn" target="_blank" rel="noopener" data-t="foot.dir">Get directions</a></div>
       </div>
       <div class="f-cols">
         <nav class="f-col" aria-label="Shop">
@@ -87,10 +87,10 @@
       </div>
     </div>
     <ul class="f-promise" aria-label="What you get">
-      <li><i></i>100% original</li><li><i></i>Cash on delivery</li><li><i></i>Delivery all over Lebanon</li><li><i></i>Easy size swaps</li>
+      <li><i></i><span data-t="foot.p1">100% original</span></li><li><i></i><span data-t="foot.p2">Cash on delivery</span></li><li><i></i><span data-t="foot.p3">Delivery all over Lebanon</span></li><li><i></i><span data-t="foot.p4">Easy size swaps</span></li>
     </ul>
     <div class="f-legal">
-      <span>© <span id="year"></span> THREADS Activewear &amp; Lifestyle, Lebanon.</span>
+      <span>© <span id="year"></span> <span data-t="foot.legal">THREADS Activewear &amp; Lifestyle, Lebanon.</span></span>
       <span class="f-credit">Website by <a href="https://www.ahos.xyz" target="_blank" rel="noopener">www.ahos.xyz</a></span>
     </div>
     <div class="f-word" aria-hidden="true"><span>THR</span><span class="f-e" data-emblem><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 0h70l-9 22H21z" fill="currentColor"/><path class="mid" d="M18 39h70l-9 22H9z"/><path d="M6 78h70l-9 22H-3z" fill="currentColor"/></svg></span><span>ADS</span></div>
@@ -100,7 +100,7 @@
   <div class="scrim" id="scrim" hidden></div>
   <aside class="drawer" id="drawer" aria-label="Your bag" aria-hidden="true">
     <div class="drawer-head">
-      <h3 id="drawerTitle">Your bag</h3>
+      <h3 id="drawerTitle" data-t="bag.title">Your bag</h3>
       <button class="icon-btn dark" id="closeDrawer" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="drawer-body" id="drawerBody" data-lenis-prevent></div>
@@ -110,16 +110,16 @@
   <!-- Mobile menu -->
   <aside class="mmenu" id="mmenu" aria-hidden="true" data-lenis-prevent>
     <div class="mmenu-head">
-      <img src="/brand/logo-white.png" alt="THREADS">
+      <img src="/brand/logo-white.png" alt="THREADS" data-img="img.logo">
       <button class="icon-btn" id="closeMenu" aria-label="Close menu"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <a href="/shop?gender=Women" data-link>Women</a>
-    <a href="/shop?gender=Men" data-link>Men</a>
-    <a href="/shop" data-link>Shop all</a>
-    <a href="/shop?sale=1" data-link>Sale</a>
+    <a href="/shop?gender=Women" data-link data-t="nav.women">Women</a>
+    <a href="/shop?gender=Men" data-link data-t="nav.men">Men</a>
+    <a href="/shop" data-link data-t="nav.all">Shop all</a>
+    <a href="/shop?sale=1" data-link data-t="nav.sale">Sale</a>
     <div class="mmenu-cats" id="mmenuCats"></div>
     <div class="mmenu-brands" id="mmenuBrands"></div>
-    <div class="mmenu-foot">Need help? <a id="mmWa" target="_blank" rel="noopener">WhatsApp us</a></div>
+    <div class="mmenu-foot"><span data-t="nav.help">Need help?</span> <a id="mmWa" target="_blank" rel="noopener" data-t="nav.wa">WhatsApp us</a></div>
   </aside>
 
   <!-- Search -->
@@ -128,7 +128,7 @@
       <div class="wrap">
         <form class="search-row" id="searchForm">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#39ff14" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
-          <input type="search" id="searchInput" placeholder="Search products" autocomplete="off" enterkeyhint="search">
+          <input type="search" id="searchInput" placeholder="Search products" data-t-ph="search.placeholder" autocomplete="off" enterkeyhint="search">
           <button type="button" class="icon-btn" id="searchClose" aria-label="Close search"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </form>
         <div id="searchRes"></div>
@@ -140,18 +140,18 @@
   <div class="modal" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle">
     <div class="modal-card wcard" data-lenis-prevent>
       <div class="modal-top">
-        <img src="/brand/logo-white.png" alt="THREADS Activewear &amp; Lifestyle" class="wlogo">
-        <span class="pill">ACTIVEWEAR &amp; LIFESTYLE</span>
+        <img src="/brand/logo-white.png" alt="THREADS Activewear &amp; Lifestyle" class="wlogo" data-img="img.logo">
+        <span class="pill" data-t="pop.pill">ACTIVEWEAR &amp; LIFESTYLE</span>
       </div>
-      <h2 id="wTitle">YOUR NEXT FAVORITE FIT.</h2>
-      <p class="green-t">Move Your Way.</p>
-      <p class="modal-sub">Join the THREADS community for new arrivals, exclusive offers and a smoother shopping experience.</p>
+      <h2 id="wTitle" data-t="pop.title">YOUR NEXT FAVORITE FIT.</h2>
+      <p class="green-t" data-t="pop.green">Move Your Way.</p>
+      <p class="modal-sub" data-t="pop.sub">Join the THREADS community for new arrivals, exclusive offers and a smoother shopping experience.</p>
       <div id="welcomeStep1">
-        <button class="wbtn wbtn-green" id="wGetStarted" type="button">GET STARTED</button>
-        <button class="wbtn wbtn-ghost" id="wBrowse" type="button">CONTINUE BROWSING</button>
+        <button class="wbtn wbtn-green" id="wGetStarted" type="button" data-t="pop.start">GET STARTED</button>
+        <button class="wbtn wbtn-ghost" id="wBrowse" type="button" data-t="pop.browse">CONTINUE BROWSING</button>
       </div>
       <form id="welcomeForm" hidden novalidate>
-        <h4>LET'S GET TO KNOW YOU</h4>
+        <h4 data-t="pop.form_t">LET'S GET TO KNOW YOU</h4>
         <p class="modal-hint" id="wHint">Fill in your details to continue with your shopping activity.</p>
         <div class="row2">
           <input name="first_name" placeholder="First name" autocomplete="given-name" required>
@@ -162,11 +162,11 @@
         <div class="phone-row"><span id="wDial">+961</span><input name="phone" type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel-national" required></div>
         <div class="w-err" id="wErr"></div>
         <p class="w-privacy">Your details will be handled according to our <a href="/privacy" data-link>Privacy Policy</a>.</p>
-        <label class="wcheck"><input type="checkbox" name="marketing"><i></i><span>I agree to receive marketing offers and updates from THREADS.</span></label>
-        <button class="wbtn wbtn-green" type="submit" id="wSubmit">SUBMIT DETAILS</button>
-        <button class="wbtn wbtn-ghost" type="button" id="wSkip">CONTINUE BROWSING</button>
+        <label class="wcheck"><input type="checkbox" name="marketing"><i></i><span data-t="pop.consent">I agree to receive marketing offers and updates from THREADS.</span></label>
+        <button class="wbtn wbtn-green" type="submit" id="wSubmit" data-t="pop.submit">SUBMIT DETAILS</button>
+        <button class="wbtn wbtn-ghost" type="button" id="wSkip" data-t="pop.browse">CONTINUE BROWSING</button>
       </form>
-      <p class="modal-foot">THREADS ACTIVEWEAR &amp; LIFESTYLE · LEBANON</p>
+      <p class="modal-foot" data-t="pop.foot">THREADS ACTIVEWEAR &amp; LIFESTYLE · LEBANON</p>
     </div>
   </div>
 
@@ -176,7 +176,7 @@
       <div class="mt"><h2>Size guide</h2><button class="icon-btn dark" id="sgClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="seg" id="sgSeg"><button class="on" data-t="w">Women</button><button data-t="m">Men</button></div>
       <div id="sgTable"></div>
-      <p>Measurements in cm, body size. Between sizes? Size up for a relaxed fit, or message us on WhatsApp and we'll help you pick.</p>
+      <p data-t="sg.note">Measurements in cm, body size. Between sizes? Size up for a relaxed fit, or message us on WhatsApp and we'll help you pick.</p>
     </div>
   </div>
 
@@ -186,6 +186,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js" defer></script>
   <script src="/js/home-defaults.js" defer></script>
+  <script src="/js/site-texts.js" defer></script>
   <script src="/js/logo-shapes.js" defer></script>
   <script src="/js/fx.js" defer></script>
   <script src="/js/store.js" defer></script>

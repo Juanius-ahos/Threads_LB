@@ -27,6 +27,29 @@
     clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800);
   }
   const confirmBox = msg => window.confirm(msg);
+  // Photos are shrunk in the browser and sent one at a time: phone photos are big and the host takes about 4 MB per request.
+  async function shrink(f) {
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type) || f.size < 900e3) return f;
+    try {
+      const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+      const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      const b = await new Promise(r => c.toBlob(r, 'image/webp', 0.9));
+      return b && b.size < f.size ? new File([b], f.name.replace(/\.\w+$/, '') + '.webp', { type: 'image/webp' }) : f;
+    } catch { return f; }
+  }
+  async function sendPhotos(files, url, field = 'files') {
+    const out = [];
+    for (const f of files) {
+      const small = await shrink(f);
+      if (small.size > 4.3e6) throw new Error(`${f.name} is too big. Save it as a JPG under 4 MB and try again.`);
+      const fd = new FormData(); fd.append(field, small, small.name);
+      out.push(await api(url, { method: 'POST', body: fd }));
+    }
+    return out;
+  }
+  const uploadPhotos = async (files, wide) => (await sendPhotos(files, '/api/admin/upload' + (wide ? '?wide=1' : ''))).flatMap(r => r.urls);
 
   // ---------- auth ----------
   function showLogin() { $('#shell').hidden = true; $('#login').hidden = false; $('#pw').focus(); }
@@ -49,7 +72,7 @@
     $$('.side-nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === v));
     closeSheet();
     window.scrollTo(0, 0);
-    ({ home: Home, orders: Orders, products: Products, homepage: Homepage, import: Import, community: Community, settings: Settings }[v] || Home)();
+    ({ home: Home, orders: Orders, products: Products, homepage: Homepage, texts: Texts, import: Import, community: Community, settings: Settings }[v] || Home)();
   }
   async function refreshBadge() {
     try { const s = await api('/api/admin/stats'); const b = $('#pendingBadge'); b.hidden = !s.pending; b.textContent = s.pending; return s; } catch { return null; }
@@ -334,8 +357,7 @@
       files = [...files].filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
       if (!files.length) return;
       drawImgs(files.length);
-      const fd = new FormData(); files.forEach(f => fd.append('files', f));
-      try { const r = await api('/api/admin/upload', { method: 'POST', body: fd }); d.images.push(...r.urls); sh.dataset.dirty = '1'; }
+      try { d.images.push(...await uploadPhotos(files)); sh.dataset.dirty = '1'; }
       catch (e) { toast(e.message, 1); }
       drawImgs();
     }
@@ -355,8 +377,7 @@
       if ($('#cutFile')) $('#cutFile').onchange = async e => {
         const file = e.target.files[0]; if (!file) return;
         drawCut(true);
-        const fd = new FormData(); fd.append('files', file);
-        try { const r = await api('/api/admin/upload', { method: 'POST', body: fd }); d.cutout = r.urls[0]; sh.dataset.dirty = '1'; }
+        try { d.cutout = (await uploadPhotos([file]))[0]; sh.dataset.dirty = '1'; }
         catch (err) { toast(err.message, 1); }
         drawCut();
       };
@@ -416,7 +437,7 @@
           <div class="actions"><a class="btn btn-light" href="/" target="_blank">Preview store</a><button class="btn btn-dark" id="hpSave">Save homepage</button></div></div>
         <div style="display:grid;gap:14px;max-width:900px">
           <div class="card card-pad"><h3>Top of the page</h3>
-            <p class="hint" style="margin:0 0 12px">The hero shows your products turning in 3D, so it has no photo. Products appear there once they have a 3D cutout (Products → edit → 3D cutout).</p>
+            <p class="hint" style="margin:0 0 12px">The hero shows the logos of your brands turning in 3D (the brands listed under Brands below), so it has no photo.</p>
             <div class="g2">${inp('slides.0.kicker', 'Small label', 'Activewear & lifestyle · Lebanon')}${inp('slides.0.title', 'Headline', 'Move your *way.*')}</div>
             ${inp('slides.0.text', 'Text', 'One or two short sentences')}
             <div class="g2">${inp('slides.0.button', 'Button', 'Shop women')}${inp('slides.0.link', 'Button link', '/shop?gender=Women', 'dlLinks')}</div>
@@ -477,9 +498,8 @@
       $$('[data-k]').forEach(el => el.tagName === 'SELECT' && el.addEventListener('change', () => set(el.dataset.k, el.value)));
       $$('[data-up]').forEach(el => el.onchange = async () => {
         if (!el.files[0]) return;
-        const fd = new FormData(); fd.append('files', el.files[0]);
         el.parentElement.firstChild.textContent = 'Uploading…';
-        try { const r = await api('/api/admin/upload' + (el.dataset.wide !== undefined ? '?wide=1' : ''), { method: 'POST', body: fd }); set(el.dataset.up, r.urls[0]); draw(); toast('Photo uploaded — remember to Save'); }
+        try { set(el.dataset.up, (await uploadPhotos([el.files[0]], el.dataset.wide !== undefined))[0]); draw(); toast('Photo uploaded — remember to Save'); }
         catch (e) { toast(e.message, 1); el.parentElement.firstChild.textContent = 'Upload photo'; }
       });
       $$('[data-check]').forEach(el => el.onchange = () => set(el.dataset.check, el.checked));
@@ -495,6 +515,59 @@
         try { await api('/api/admin/settings', { method: 'PUT', body: { home: JSON.stringify(H) } }); toast('Homepage saved 🎉'); draw(); }
         catch (e) { toast(e.message, 1); }
       };
+    };
+    draw();
+  }
+
+  // =================== SITE TEXTS ===================
+  // Every fixed word on the site (js/site-texts.js). Empty = the original wording.
+  async function Texts() {
+    const s = await api('/api/admin/settings');
+    let TX; try { TX = JSON.parse(s.texts || '{}') || {}; } catch { TX = {}; }
+    const groups = window.SITE_TEXTS || [], images = window.SITE_IMAGES || [];
+    let q = '';
+    const changed = k => typeof TX[k] === 'string' && TX[k].trim() !== '';
+    const field = ([k, label, def]) => {
+      const long = def.length > 70 || def.includes('\n');
+      const val = esc(TX[k] || '');
+      return `<label class="field tx-field" data-find="${esc((label + ' ' + def + ' ' + (TX[k] || '')).toLowerCase())}"><span>${esc(label)}${changed(k) ? ' <small class="tx-changed">changed</small> <button type="button" class="tx-reset" data-reset="' + k + '">use original</button>' : ''}</span>
+        ${long ? `<textarea class="input" data-tx="${k}" placeholder="${esc(def)}" rows="3">${val}</textarea>` : `<input class="input" data-tx="${k}" placeholder="${esc(def)}" value="${val}">`}</label>`;
+    };
+    const draw = () => {
+      const n = Object.keys(TX).filter(changed).length;
+      view.innerHTML = `
+        <div class="ph"><h1>Site texts</h1><p class="sub">Every word on the website. The grey text is what the site says now: type over it to change it, clear the box to go back. Words in {braces} are filled in by the site (prices, names), keep them. Wrap a word in *stars* in a title to make it green.</p>
+          <div class="actions"><a class="btn btn-light" href="/" target="_blank">Preview store</a><button class="btn btn-dark" id="txSave">Save texts</button></div></div>
+        <div style="display:grid;gap:14px;max-width:900px">
+          <div class="card card-pad" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input class="input" id="txFind" placeholder="Find a word on the site, e.g. delivery" value="${esc(q)}" style="flex:1;min-width:220px">
+            <small style="color:var(--muted)">${n ? `${n} text${n === 1 ? '' : 's'} changed` : 'Nothing changed yet'}</small>
+          </div>
+          <div class="card card-pad"><h3>Logo</h3>
+            ${images.map(([k, label, def]) => `<div class="field"><span>${esc(label)}</span><div class="hp-img"><div class="hp-prev" style="background:#1c1d20 url('${esc(TX[k] || def)}') center/contain no-repeat"></div>
+              <div style="flex:1;min-width:0"><input class="input" data-tx="${k}" value="${esc(TX[k] || '')}" placeholder="${esc(def)}">
+              <label class="btn btn-light btn-sm" style="position:relative;margin-top:8px">Upload<input type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg" data-txup="${k}" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div></div></div>`).join('')}
+          </div>
+          ${groups.map(g => `<details class="card card-pad tx-group" ${q ? 'open' : ''}><summary><h3 style="display:inline">${esc(g.group)}</h3> <span class="right" style="color:var(--muted)">${g.items.filter(([k]) => changed(k)).length ? g.items.filter(([k]) => changed(k)).length + ' changed · ' : ''}${g.items.length}</span></summary>
+            <div style="margin-top:12px">${g.items.map(field).join('')}</div></details>`).join('')}
+        </div>`;
+      const filter = () => {
+        $$('.tx-field').forEach(f => { f.hidden = !!q && !f.dataset.find.includes(q); });
+        $$('.tx-group').forEach(d => { const any = $$('.tx-field', d).some(f => !f.hidden); d.hidden = !any; if (q) d.open = true; });
+      };
+      $('#txFind').oninput = e => { q = e.target.value.trim().toLowerCase(); filter(); };
+      $$('[data-tx]').forEach(el => el.addEventListener('input', () => { TX[el.dataset.tx] = el.value; }));
+      $$('[data-reset]').forEach(b => b.onclick = e => { e.preventDefault(); delete TX[b.dataset.reset]; draw(); });
+      $$('[data-txup]').forEach(el => el.onchange = async () => {
+        if (!el.files[0]) return;
+        try { TX[el.dataset.txup] = (await uploadPhotos([el.files[0]]))[0]; draw(); toast('Uploaded — remember to Save'); } catch (e) { toast(e.message, 1); }
+      });
+      $('#txSave').onclick = async () => {
+        const clean = Object.fromEntries(Object.entries(TX).filter(([, v]) => typeof v === 'string' && v.trim()));
+        try { await api('/api/admin/settings', { method: 'PUT', body: { texts: JSON.stringify(clean) } }); TX = clean; toast('Texts saved 🎉'); draw(); }
+        catch (e) { toast(e.message, 1); }
+      };
+      filter();
     };
     draw();
   }
@@ -531,9 +604,9 @@
     wireDrop($('#bdrop'), $('#bfile'), async files => {
       if (!files.length) return;
       $('#xresult').innerHTML = `<div class="card empty"><div class="spinner" style="margin:auto"></div><p>Uploading ${files.length} photo(s)…</p></div>`;
-      const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
       try {
-        const r = await api('/api/admin/bulk-photos', { method: 'POST', body: fd });
+        const rs = await sendPhotos([...files], '/api/admin/bulk-photos');
+        const r = { matched: rs.flatMap(x => x.matched), unmatched: rs.flatMap(x => x.unmatched) };
         $('#xresult').innerHTML = `<div class="result-box">✅ <b>${r.matched.length}</b> photo(s) attached to ${new Set(r.matched.map(m => m.sku)).size} product(s).</div>
           ${r.unmatched.length ? `<div class="card card-pad"><h3>No matching SKU for ${r.unmatched.length} file(s)</h3><p class="hint" style="margin-top:0">Rename them to start with the product SKU and try again:</p><p style="margin:0">${r.unmatched.map(esc).join(', ')}</p></div>` : ''}`;
       } catch (e) { $('#xresult').innerHTML = `<div class="card card-pad" style="color:var(--red)">${esc(e.message)}</div>`; }

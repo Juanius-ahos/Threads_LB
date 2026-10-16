@@ -22,6 +22,7 @@ npm start
 | **Home** | New orders waiting, sales chart, low-stock warnings |
 | **Orders** | Every COD order. Tap one to: confirm on WhatsApp with a pre-written message, call, set status (Pending → Confirmed → Shipped → Delivered / Cancelled), print a slip for the driver. Cancelling puts the stock back. Export to Excel. |
 | **Products** | Add or edit products: drag & drop photos straight from the phone (resized automatically), sizes + stock, sale price, hide/show, feature on the homepage (featured pieces lead "New in"). Add a **3D cutout** (a PNG of the piece on a transparent background) and the piece stands on the homepage's 3D stand and gets a 3D view on its page. |
+| **Site texts** | Every other word on the site (menu, section titles, product page, bag, checkout, popup, footer, privacy) and the logo. Grey text shows the current wording; type over it to change it, clear it to go back. |
 | **Homepage** | The words and photos on the front page: the hero headline, label and buttons, the two campaign banners, brand and Women/Men photos, and the green ticker. Empty photos fall back to the brand campaign photos in `public/campaign/`. Wrap a word in `*stars*` to make it green. |
 | **Excel import** | Download the template, fill one row per product (`Sizes` column like `S:5, M:10, L:3`), upload, preview, import. Same SKU updates the existing product. **Bulk photos:** name photos after the SKU (`NK-TEE-001.jpg`, `NK-TEE-001-2.jpg`) and drop them all at once. |
 | **Community** | People who signed up through the "Your next favorite fit" popup. Export to Excel. |
@@ -46,28 +47,40 @@ npm run build:pages
 
 then publish the `dist` folder to the `gh-pages` branch. The admin panel, stock tracking and the sign-up list need the full server below.
 
-## Put it online
+## Put it online (free): Vercel + Supabase
 
-It's one Node app. All data (database + uploaded photos) lives in the `data/` folder, so the host **must have a persistent disk**.
+The live site runs on **Vercel** (pages + API) with its data in **Supabase** (Postgres database + photo storage). Both have free plans.
 
-**Railway (easiest, about $5/month):**
-1. Push this `site` folder to a GitHub repo.
-2. On railway.app: New Project → Deploy from GitHub.
-3. Add a **Volume** mounted at `/data` and set the variable `DATA_DIR=/data`.
-4. Optional: set `ADMIN_PASSWORD=...`. It overrides the admin password on every start.
-5. Settings → Networking → Generate domain, or connect your own domain.
+1. **Supabase** → New project. From Project Settings copy the Project URL, the `service_role` key and the *Transaction pooler* connection string.
+2. **Vercel** → Add New → Project → import this GitHub repo. Under Environment Variables add:
+   - `DATABASE_URL`: the pooler connection string (with the database password in it)
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+   - `ADMIN_PASSWORD`: the admin password (change it here, not in the admin)
+   - `SESSION_SECRET`: any long random text
+3. Deploy. The first request creates the tables and the starter products. Every push to `main` deploys again.
+4. Vercel → Project → Settings → Domains → add your domain and copy the DNS records it shows into your domain registrar.
 
-The same setup works on Render (with a disk), Fly.io (with a volume) or any VPS with `npm start` behind nginx.
+Load products from an Excel file straight into the live database (put the four variables in a `.env` file first, it is never committed):
 
-**Backups:** download the `data/` folder from time to time. Exporting products and orders to Excel from the admin also works as a backup.
+```
+node scripts/import-file.js "products.xlsx"
+```
+
+`scripts/convert-stock.js` turns the shop's own stock sheet (Code / Items / Color / Units / Prices / Sizes) into that format.
+
+**Running on a computer** needs no database: without `DATABASE_URL` the store keeps everything in `data/` (an embedded Postgres in `data/pg` and photos in `data/uploads`).
+
+**Backups:** Supabase keeps daily backups on paid plans only; export products and orders to Excel from the admin from time to time.
 
 ## Files
 
 ```
-server.js          API + pages
-src/db.js          SQLite database, settings, demo products
+server.js          API + pages (also the Vercel function, via api/index.js)
+src/db.js          Postgres (Supabase, or embedded in data/pg), settings, demo products
+src/media.js       uploaded photos: Supabase Storage, or data/uploads
 src/excel.js       Excel import/export
 public/            storefront (index.html, css/, js/) and brand images
 public/admin/      admin panel
-data/              created at runtime: store.db + uploads/ (don't delete!)
+public/js/site-texts.js   every editable word on the site and its original wording
+data/              local only: pg/ database + uploads/ (don't delete!)
 ```

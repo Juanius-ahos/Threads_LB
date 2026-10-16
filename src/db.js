@@ -1,70 +1,123 @@
+// The store's data lives in Postgres: Supabase when DATABASE_URL is set (the live site),
+// otherwise an embedded Postgres in data/pg, so the shop also runs on a laptop with nothing to install.
+// Write SQL with ? placeholders; q() numbers them for Postgres.
 const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
+const crypto = require('crypto');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const NOW = "to_char(now() at time zone 'utc', 'YYYY-MM-DD HH24:MI:SS')";   // dates stay "YYYY-MM-DD HH:MM:SS" text in UTC
 
-const db = new Database(path.join(DATA_DIR, 'store.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const numbered = sql => { let i = 0; return sql.replace(/\?/g, () => `$${++i}`); };
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS products (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sku TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  brand TEXT DEFAULT '',
-  category TEXT DEFAULT '',
-  gender TEXT DEFAULT 'Unisex',
-  color TEXT DEFAULT '',
-  swatch TEXT DEFAULT '',
-  description TEXT DEFAULT '',
-  price REAL NOT NULL DEFAULT 0,
-  sale_price REAL,
-  sizes TEXT NOT NULL DEFAULT '[]',      -- JSON [{size, stock}]
-  images TEXT NOT NULL DEFAULT '[]',     -- JSON ["/uploads/x.webp", ...]
-  featured INTEGER DEFAULT 0,
-  active INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  number TEXT UNIQUE NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  customer_name TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  email TEXT DEFAULT '',
-  city TEXT DEFAULT '',
-  address TEXT NOT NULL,
-  notes TEXT DEFAULT '',
-  items TEXT NOT NULL,                   -- JSON snapshot
-  subtotal REAL NOT NULL,
-  delivery_fee REAL NOT NULL,
-  total REAL NOT NULL,
-  admin_note TEXT DEFAULT '',
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS subscribers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  first_name TEXT, last_name TEXT, email TEXT, country TEXT, phone TEXT,
-  marketing INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-`);
-if (!db.prepare('PRAGMA table_info(products)').all().some(c => c.name === 'swatch')) {
-  db.exec("ALTER TABLE products ADD COLUMN swatch TEXT DEFAULT ''");
+let ready;
+function connect() {
+  return ready ||= (async () => {
+    let conn;
+    if (process.env.DATABASE_URL) {
+      const { Pool } = require('pg');
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : { rejectUnauthorized: false } });
+      conn = {
+        query: (sql, params) => pool.query(sql, params),
+        async tx(fn) {
+          const c = await pool.connect();
+          try { await c.query('BEGIN'); const r = await fn(s => c.query(s.text, s.values)); await c.query('COMMIT'); return r; }
+          catch (e) { await c.query('ROLLBACK').catch(() => {}); throw e; }
+          finally { c.release(); }
+        },
+      };
+    } else {
+      const { PGlite } = await import('@electric-sql/pglite');
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const pg = new PGlite(path.join(DATA_DIR, 'pg'));
+      await pg.waitReady;
+      conn = {
+        query: (sql, params) => pg.query(sql, params),
+        tx: fn => pg.transaction(t => fn(sql => t.query(sql.text, sql.values))),
+      };
+    }
+    await migrate(conn);
+    return conn;
+  })();
 }
-// a transparent photo of the piece alone: it stands on the homepage's 3D stand and the product page's 3D view
-if (!db.prepare('PRAGMA table_info(products)').all().some(c => c.name === 'cutout')) {
-  db.exec("ALTER TABLE products ADD COLUMN cutout TEXT DEFAULT ''");
+
+// q`...` style helpers: all(sql, ...params) → rows, get → first row, run → { rows, count }
+const shape = (sql, params) => ({ text: numbered(sql), values: params });
+async function all(sql, ...params) { const c = await connect(); return (await c.query(numbered(sql), params)).rows; }
+async function get(sql, ...params) { return (await all(sql, ...params))[0]; }
+async function run(sql, ...params) { const c = await connect(); const r = await c.query(numbered(sql), params); return { rows: r.rows, count: r.rowCount ?? r.affectedRows }; }
+// several statements that must all happen or none: tx(async t => { await t.get(...); await t.run(...) })
+async function tx(fn) {
+  const c = await connect();
+  return c.tx(exec => {
+    const q = async (sql, params) => (await exec(shape(sql, params))).rows;
+    return fn({ all: (s, ...p) => q(s, p), get: async (s, ...p) => (await q(s, p))[0], run: (s, ...p) => q(s, p) });
+  });
 }
-const STARTER_CUTOUTS = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
+
+async function migrate(c) {
+  const ex = sql => c.query(sql);
+  await ex(`CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    sku TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    brand TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    gender TEXT DEFAULT 'Unisex',
+    color TEXT DEFAULT '',
+    swatch TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    price DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sale_price DOUBLE PRECISION,
+    sizes TEXT NOT NULL DEFAULT '[]',
+    images TEXT NOT NULL DEFAULT '[]',
+    cutout TEXT DEFAULT '',
+    featured INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT ${NOW},
+    updated_at TEXT DEFAULT ${NOW})`);
+  await ex(`CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    number TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    customer_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT DEFAULT '',
+    city TEXT DEFAULT '',
+    address TEXT NOT NULL,
+    notes TEXT DEFAULT '',
+    items TEXT NOT NULL,
+    subtotal DOUBLE PRECISION NOT NULL,
+    delivery_fee DOUBLE PRECISION NOT NULL,
+    total DOUBLE PRECISION NOT NULL,
+    admin_note TEXT DEFAULT '',
+    created_at TEXT DEFAULT ${NOW},
+    updated_at TEXT DEFAULT ${NOW})`);
+  await ex(`CREATE TABLE IF NOT EXISTS subscribers (
+    id SERIAL PRIMARY KEY,
+    first_name TEXT, last_name TEXT, email TEXT, country TEXT, phone TEXT,
+    marketing INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT ${NOW})`);
+  await ex('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)');
+  // Supabase exposes tables to its public API unless row level security is on; the store only talks to them from the server
+  if (process.env.DATABASE_URL) for (const t of ['products', 'orders', 'subscribers', 'settings']) await ex(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`);
+
+  const ins = (k, v) => c.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', [k, v]);
+  for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) await ins(k, v);
+  // First run: no password in the code. Use ADMIN_PASSWORD if the host sets one, otherwise create a random one
+  // and write it to data/ADMIN_PASSWORD.txt (and the server log) so the owner can sign in and change it.
+  if (process.env.ADMIN_PASSWORD) {
+    await c.query("INSERT INTO settings (key, value) VALUES ('admin_password', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [process.env.ADMIN_PASSWORD]);
+  } else if (!(await c.query("SELECT 1 FROM settings WHERE key = 'admin_password'")).rows.length) {
+    const first = crypto.randomBytes(6).toString('base64url');
+    await ins('admin_password', first);
+    try { fs.writeFileSync(path.join(DATA_DIR, 'ADMIN_PASSWORD.txt'), first + '\n'); } catch {}
+    console.log(`\n  Admin password created: ${first}\n  (also saved in ${path.join(DATA_DIR, 'ADMIN_PASSWORD.txt')}; change it in Admin > Settings)\n`);
+  }
+  const count = Number((await c.query('SELECT COUNT(*) AS c FROM products')).rows[0].c);
+  if (count === 0) await seed(c);
+}
 
 // Empty photos fall back to the campaign photography in public/campaign.
 const DEFAULT_HOME = {
@@ -78,8 +131,6 @@ const DEFAULT_HOME = {
   women_image: '',
   ticker: '100% original · Cash on delivery · Delivery all over Lebanon · Now open in Wadi Chahrour · Easy size swaps on WhatsApp',
 };
-// The homepage the first version shipped with (placeholder photos). A store still on it gets the new one.
-const LEGACY_HOME_MARK = 'photo-1574680088814-c9e8a10d8a4d';
 
 const DEFAULT_SETTINGS = {
   store_name: 'THREADS Activewear & Lifestyle',
@@ -94,40 +145,27 @@ const DEFAULT_SETTINGS = {
   welcome_popup: '1',
   require_signup: '1',
   home: JSON.stringify(DEFAULT_HOME),
+  texts: '{}',
   cities: 'Beirut, Mount Lebanon, Metn, Keserwan, Jbeil, Batroun, North Lebanon, Tripoli, Akkar, Bekaa, Zahle, Baalbek, South Lebanon, Saida, Tyre, Nabatieh',
 };
-const insSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insSetting.run(k, v);
-// First run: no password in the code. Use ADMIN_PASSWORD if the host sets one, otherwise create a random one
-// and write it to data/ADMIN_PASSWORD.txt (and the server log) so the owner can sign in and change it.
-if (!db.prepare("SELECT 1 FROM settings WHERE key = 'admin_password'").get()) {
-  const first = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(6).toString('base64url');
-  insSetting.run('admin_password', first);
-  if (!process.env.ADMIN_PASSWORD) {
-    fs.writeFileSync(path.join(DATA_DIR, 'ADMIN_PASSWORD.txt'), first + '\n');
-    console.log(`\n  Admin password created: ${first}\n  (also saved in ${path.join(DATA_DIR, 'ADMIN_PASSWORD.txt')}; change it in Admin > Settings)\n`);
-  }
-}
-if (process.env.ADMIN_PASSWORD) {
-  db.prepare("UPDATE settings SET value = ? WHERE key = 'admin_password'").run(process.env.ADMIN_PASSWORD);
-}
 
-function getSettings() {
+async function getSettings() {
   const out = {};
-  for (const r of db.prepare('SELECT key, value FROM settings').all()) out[r.key] = r.value;
+  for (const r of await all('SELECT key, value FROM settings')) out[r.key] = r.value;
   return out;
 }
-function setSetting(key, value) {
-  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
+async function setSetting(key, value) {
+  await run('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', key, String(value));
 }
 
 function slugify(s) {
   return String(s).toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 80) || 'item';
 }
-function uniqueSlug(base, ignoreId) {
+async function uniqueSlug(base, ignoreId, t) {
+  const g = t ? t.get : get;
   let slug = slugify(base), n = 1;
   while (true) {
-    const row = db.prepare('SELECT id FROM products WHERE slug = ?').get(slug);
+    const row = await g('SELECT id FROM products WHERE slug = ?', slug);
     if (!row || row.id === ignoreId) return slug;
     slug = `${slugify(base)}-${++n}`;
   }
@@ -147,8 +185,7 @@ function rowToProduct(r) {
 }
 
 // Starter catalogue built from the store's own product photos (public/products) — edit or delete from the admin.
-const count = db.prepare('SELECT COUNT(*) c FROM products').get().c;
-if (count === 0) {
+async function seed(c) {
   const P = f => `/products/${f}.webp`;
   const women = 'XS:3,S:6,M:6,L:4';
   const shortsDesc = `Two-in-one running shorts with a lightweight woven outer and a supportive inner layer, so nothing rides up mid-run.
@@ -157,6 +194,7 @@ if (count === 0) {
 • Wide elastic waistband
 • Side splits for free movement
 • Reflective details for early or late runs`;
+  const CUT = { 'TNF-SET-LAV': '/products/cut-tnf.webp', 'ON-SET-CRL': '/products/cut-on.webp', 'ON-SHT-BLK': '/products/cut-shorts-black.webp', 'ON-SHT-OLV': '/products/cut-shorts-olive.webp', 'ON-SHT-PLM': '/products/cut-shorts-plum.webp' };
   const demo = [
     ['ON-SHT-OLV', 'Running Shorts 2-in-1', 'On', 'Shorts', 'Women', 'Olive', '#5d6450', 55, null, women, [P('on-shorts-olive')], 1, shortsDesc],
     ['ON-SHT-BLS', 'Running Shorts 2-in-1', 'On', 'Shorts', 'Women', 'Blush', '#d79b8f', 55, null, women, [P('on-shorts-blush'), P('on-shorts-blush-cream-pair')], 1, shortsDesc],
@@ -185,21 +223,12 @@ if (count === 0) {
 • Zip hand pockets
 • Ribbed cuffs`],
   ];
-  const ins = db.prepare(`INSERT INTO products (sku, name, slug, brand, category, gender, color, swatch, description, price, sale_price, sizes, images, featured)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const [sku, name, brand, cat, gender, color, swatch, price, sale, sizes, imgs, feat, desc] of demo) {
     const sz = sizes.split(',').map(p => { const [size, stock] = p.split(':'); return { size, stock: Number(stock) }; });
-    ins.run(sku, name, uniqueSlug(`${name} ${color}`), brand, cat, gender, color, swatch, desc, price, sale, JSON.stringify(sz), JSON.stringify(imgs), feat);
+    await c.query(`INSERT INTO products (sku, name, slug, brand, category, gender, color, swatch, description, price, sale_price, sizes, images, cutout, featured)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
+      [sku, name, slugify(`${name} ${color}`), brand, cat, gender, color, swatch, desc, price, sale, JSON.stringify(sz), JSON.stringify(imgs), CUT[sku] || '', feat]);
   }
 }
 
-{
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'home'").get();
-  if (row && row.value.includes(LEGACY_HOME_MARK)) db.prepare("UPDATE settings SET value = ? WHERE key = 'home'").run(JSON.stringify(DEFAULT_HOME));
-}
-{
-  const fill = db.prepare("UPDATE products SET cutout = ? WHERE sku = ? AND (cutout IS NULL OR cutout = '')");
-  for (const [sku, url] of Object.entries(STARTER_CUTOUTS)) fill.run(url, sku);
-}
-
-module.exports = { DEFAULT_HOME, db, DATA_DIR, UPLOAD_DIR, getSettings, setSetting, slugify, uniqueSlug, rowToProduct };
+module.exports = { DEFAULT_HOME, DATA_DIR, NOW, connect, all, get, run, tx, getSettings, setSetting, slugify, uniqueSlug, rowToProduct };

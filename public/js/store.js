@@ -61,6 +61,16 @@
     return `srcset="${widths.map(w => `${src(url, w)} ${w}w`).join(', ')}"`;
   }
   const rich = t => esc(t).replace(/\*(.+?)\*/g, '<em>$1</em>');   // *word* → green accent
+  // Every fixed word on the site comes from js/site-texts.js, unless the owner changed it in Admin → Site texts.
+  const TEXT_DEFAULTS = Object.fromEntries((window.SITE_TEXTS || []).flatMap(g => g.items.map(([k, , d]) => [k, d])));
+  let TX = {};
+  const T = (k, vars) => {
+    const own = TX[k];
+    let t = typeof own === 'string' && own.trim() ? own : (TEXT_DEFAULTS[k] ?? '');
+    return vars ? t.replace(/\{(\w+)\}/g, (m, v) => (v in vars ? String(vars[v]) : m)) : t;
+  };
+  const tx = (k, vars) => esc(T(k, vars));
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   function toast(html, img) {
     const t = $('#toast');
@@ -234,13 +244,6 @@
   const brandNames = () => (H('brands') || []).map(b => b.name).filter(Boolean);
   const categoryList = () => (H('categories') || []).filter(c => c.name);
 
-  const STEPS = ['Order', 'Confirm', 'Deliver', 'Pay'];
-  const STEP_TEXT = (fee, freeOver) => [
-    'Pick your size and order in a minute. No account, no card.',
-    'We message you on WhatsApp to confirm your order and address.',
-    `Our driver brings it anywhere in Lebanon. Delivery ${money(fee)}${freeOver ? `, free over ${money(freeOver)}` : ''}.`,
-    'Pay cash at your door when it arrives.',
-  ];
   const pic = (name, alt = '', sizes = '100vw', lazy = true) => `<img src="${C(name)}" srcset="${Cs(name)} 900w, ${C(name)} 1800w" sizes="${sizes}" alt="${esc(alt)}"${lazy ? ' loading="lazy"' : ''}>`;
   const ownPic = (url, name, sizes) => url && !OLD_DEFAULTS.test(url) ? `<img src="${esc(src(url, 1600))}" ${srcset(url, [800, 1200, 1800])} sizes="${sizes}" alt="" loading="lazy">` : pic(name, '', sizes);
   const logoRow = () => brandNames().map(b => `<a href="/shop?brand=${encodeURIComponent(b)}" data-link><img src="${brandLogo(b)}" alt="${esc(b)}"></a>`).join('');
@@ -253,7 +256,7 @@
   const E_BARS = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 0h70l-9 22H21z"/><path class="mid" d="M18 39h70l-9 22H9z"/><path d="M6 78h70l-9 22H-3z"/></svg>';
 
   function renderHome() {
-    document.title = 'THREADS — Activewear & Lifestyle';
+    document.title = T('meta.title');
     const groups = groupsOf(PRODUCTS);
     const freeOver = Number(S.free_delivery_over) || 0;
     const fee = Number(S.delivery_fee) || 0;
@@ -280,7 +283,7 @@
           </div>
         </div>
       </section>` : '';
-    const words = STEP_TEXT(fee, freeOver);
+    const words = [1, 2, 3, 4].map(i => T(`home.step${i}`, { fee: money(fee), free: freeOver ? `, free over ${money(freeOver)}` : '' }));
     const wall = H('wall').filter(w => w.image);
     const promises = H('promises').slice(0, 3);
     const outline = t => `<span class="outline" aria-hidden="true">${esc(t)}</span>`;
@@ -320,12 +323,12 @@
       <section class="duo" aria-label="Shop women and men">
         ${[['Women', HOME.women_image, 'adidas-squat'], ['Men', HOME.men_image, 'nike-run-man']].map(([g, url, art]) => `<a class="duo-tile" href="/shop?gender=${g}" data-link data-cursor="Shop">
           ${ownPic(url, art, '(max-width: 640px) 100vw, 50vw')}
-          <span class="duo-label"><b>${g}</b><span class="duo-n">${(n => n ? `${n} piece${n === 1 ? '' : 's'}` : 'Coming soon')(PRODUCTS.filter(p => p.gender === g || p.gender === 'Unisex').length)}</span></span>
+          <span class="duo-label"><b>${g}</b><span class="duo-n">${(n => n ? plural(n, 'piece', 'pieces') : tx('home.soon'))(PRODUCTS.filter(p => p.gender === g || p.gender === 'Unisex').length)}</span></span>
         </a>`).join('')}
       </section>
 
       <section class="rail-sec">
-        <div class="sec-row"><div><h2 class="h-sec">Just landed</h2><p class="sec-sub">Fresh on the wall this week.</p></div><a class="link" href="/shop" data-link>Shop all</a></div>
+        <div class="sec-row"><div><h2 class="h-sec">${rich(T('home.rail_title'))}</h2><p class="sec-sub">${tx('home.rail_sub')}</p></div><a class="link" href="/shop" data-link>${tx('home.rail_link')}</a></div>
         <div class="rail" id="rail">${newIn.map(v => card(v)).join('')}</div>
         <div class="rail-btns"><button type="button" class="icon-btn" data-rail="-1" aria-label="Scroll left"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" class="icon-btn" data-rail="1" aria-label="Scroll right"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
       </section>
@@ -333,21 +336,21 @@
       ${on('promises') && promises.length ? `<section class="promises" id="promises" aria-label="The THREADS promise">
         <div class="promises-stage">
           <div class="promises-gl" aria-hidden="true"><span class="promises-flat">${E_BARS}</span></div>
-          <p class="promises-kick">${outline('THREADS')}</p>
+          <p class="promises-kick">${outline(T('home.promises_word'))}</p>
           <ol class="promises-list">${promises.map((p, i) => `<li data-step="${i}"><b>${esc(p.title)}</b><span>${esc(p.text)}</span></li>`).join('')}</ol>
         </div>
       </section>` : ''}
 
       ${on('wall') && wall.length ? `<section class="wall-sec">
-        <div class="wall-back" aria-hidden="true">${outline('On the wall · On the wall · On the wall ·')}</div>
-        <div class="sec-row"><div><h2 class="h-sec">On the wall right now</h2><p class="sec-sub">Photographed in the shop in Wadi Chahrour. Tap one to shop it.</p></div><a class="link" href="${esc(S.instagram || '#')}" target="_blank" rel="noopener">@threadsactivewear</a></div>
-        <div class="wall" id="wall" data-cursor="Drag">${wall.map(w => { const p = w.sku && PRODUCTS.find(x => x.sku === w.sku); const href = p ? `/p/${p.slug}` : (w.link || S.instagram || '#'); const ext = !p && /^https?:/.test(href); return `<a class="wall-item" href="${esc(href)}" ${ext ? 'target="_blank" rel="noopener"' : 'data-link'}><img src="${esc(own(w.image, w.image))}" alt="${esc(p ? `${p.brand} ${p.name}` : w.caption || '')}" loading="lazy" draggable="false"><span class="wall-cap">${esc(w.caption || (p ? p.name : ''))}</span><span class="wall-go">${p ? money(priceOf(p)) : 'Ask on Instagram'}</span></a>`; }).join('')}</div>
+        <div class="wall-back" aria-hidden="true">${outline(Array(3).fill(T('home.wall_back') + ' ·').join(' '))}</div>
+        <div class="sec-row"><div><h2 class="h-sec">${rich(T('home.wall_title'))}</h2><p class="sec-sub">${tx('home.wall_sub')}</p></div><a class="link" href="${esc(S.instagram || '#')}" target="_blank" rel="noopener">@threadsactivewear</a></div>
+        <div class="wall" id="wall" data-cursor="Drag">${wall.map(w => { const p = w.sku && PRODUCTS.find(x => x.sku === w.sku); const href = p ? `/p/${p.slug}` : (w.link || S.instagram || '#'); const ext = !p && /^https?:/.test(href); return `<a class="wall-item" href="${esc(href)}" ${ext ? 'target="_blank" rel="noopener"' : 'data-link'}><img src="${esc(own(w.image, w.image))}" alt="${esc(p ? `${p.brand} ${p.name}` : w.caption || '')}" loading="lazy" draggable="false"><span class="wall-cap">${esc(w.caption || (p ? p.name : ''))}</span><span class="wall-go">${p ? money(priceOf(p)) : tx('home.wall_ask')}</span></a>`; }).join('')}</div>
       </section>` : ''}
 
       ${on('banner1') ? banner(slides[1], 0) : ''}
 
       ${on('categories') && cats.length ? `<section class="cat-sec">
-        <div class="sec-row"><div><h2 class="h-sec">Shop by category</h2><p class="sec-sub">Point at one to see what is in it.</p></div></div>
+        <div class="sec-row"><div><h2 class="h-sec">${rich(T('home.cats_title'))}</h2><p class="sec-sub">${tx('home.cats_sub')}</p></div></div>
         <ol class="cat-index">${cats.map((c, i) => `<li><a href="/shop?category=${encodeURIComponent(c.name)}" data-link data-img="${esc(own(c.image, C(CAT_ART[c.name.toLowerCase()] || 'nike-trail-run')))}">
           <span class="cat-i tnum">${String(i + 1).padStart(2, '0')}</span><span class="cat-name">${esc(c.name)}</span><span class="cat-n tnum">${inCat(c.name)}</span>
           <img class="cat-thumb" src="${esc(own(c.image, Cs(CAT_ART[c.name.toLowerCase()] || 'nike-trail-run')))}" alt="" loading="lazy">
@@ -355,14 +358,14 @@
       </section>` : ''}
 
       ${on('brands') ? `<section class="brand-sec">
-        <div class="sec-row"><div><h2 class="h-sec">Four brands, all original</h2><p class="sec-sub">Straight from the brands. Never a copy.</p></div></div>
+        <div class="sec-row"><div><h2 class="h-sec">${rich(T('home.brands_title'))}</h2><p class="sec-sub">${tx('home.brands_sub')}</p></div></div>
         <div class="brand-grid">
           ${tiles.map(b => `<a class="brand-tile" href="/shop?brand=${encodeURIComponent(b.name)}" data-link data-cursor="Shop">
             ${ownPic(b.image, BRAND_ART[b.name.toLowerCase()] || 'nike-vest', '(max-width: 640px) 50vw, 25vw')}
             <span class="brand-tile-in">
               <img class="brand-tile-logo" src="${brandLogo(b.name)}" alt="${esc(b.name)}">
               <span class="brand-tile-tag">${esc(BRAND_NAME[b.name.toLowerCase()] || b.name)}</span>
-              <span class="brand-tile-n">${inBrand(b.name) ? `${inBrand(b.name)} ${inBrand(b.name) === 1 ? 'piece' : 'pieces'}` : 'Coming soon'}</span>
+              <span class="brand-tile-n">${inBrand(b.name) ? plural(inBrand(b.name), 'piece', 'pieces') : tx('home.soon')}</span>
             </span>
           </a>`).join('')}
         </div>
@@ -371,40 +374,40 @@
       ${on('pick') && live.length > 1 ? `<section class="pick" id="live">
         <div class="pick-photo live-photo">${live.map((p, i) => `<img src="${esc(p.images[0])}" alt="${esc(`${p.brand} ${p.name} in ${p.color}`)}" data-v="${i}" class="${i ? 'out' : ''}" loading="lazy">`).join('')}</div>
         <div class="pick-info">
-          <p class="pick-count">${live.length} colours</p>
+          <p class="pick-count">${tx('home.pick_count', { n: live.length })}</p>
           <h2 class="h-sec">${esc(live[0].name).replace(/-/g, '‑')}</h2>
           <div class="live-price tnum" id="livePrice"></div>
           <div class="swatch-row" role="group" aria-label="Colour">${live.map((p, i) => `<button type="button" class="swatch" style="--c:${esc(hexOf(p))}" data-v="${i}" aria-pressed="${i === 0}" aria-label="${esc(p.color)}"></button>`).join('')}</div>
           <p class="live-colour" id="liveColour"></p>
           <div class="live-sizes" id="liveSizes" role="group" aria-label="Size"></div>
           <p class="live-note" id="liveNote" aria-live="polite"></p>
-          <p class="pick-copy">The 2-in-1 that runs, trains and goes for coffee after. Light shell outside, liner inside.</p>
-          <div class="cta-row"><button class="btn btn-green" id="liveAdd">Add to bag</button><a class="link" id="liveLink" data-link>Full details</a></div>
+          <p class="pick-copy">${tx('home.pick_copy')}</p>
+          <div class="cta-row"><button class="btn btn-green" id="liveAdd">${tx('home.pick_add')}</button><a class="link" id="liveLink" data-link>${tx('home.pick_link')}</a></div>
         </div>
       </section>` : ''}
 
       ${on('banner2') ? banner(slides[2], 1) : ''}
 
       ${on('how') ? `<section class="how" aria-label="How ordering works">
-        <div class="sec-row"><div><h2 class="h-sec">Cash on delivery, all over Lebanon</h2><p class="sec-sub">No card, no account. Four steps and it is yours.</p></div></div>
-        <ol class="how-steps">${STEPS.map((s, i) => `<li><b class="tnum">${i + 1}</b><h3>${s}</h3><p>${words[i]}</p></li>`).join('')}</ol>
+        <div class="sec-row"><div><h2 class="h-sec">${rich(T('home.how_title'))}</h2><p class="sec-sub">${tx('home.how_sub')}</p></div></div>
+        <ol class="how-steps">${words.map((w, i) => `<li><b class="tnum">${i + 1}</b><h3>${tx(`home.step${i + 1}_t`)}</h3><p>${esc(w)}</p></li>`).join('')}</ol>
       </section>` : ''}
 
       ${on('visit') && S.store_address ? `<section class="visit">
         <div class="visit-copy">
-          <h2 class="h-sec">Come try it on</h2>
-          <p>Feel the fabric, find your size and leave with your fit. Everything on the site is on the wall in Wadi Chahrour.</p>
+          <h2 class="h-sec">${rich(T('home.visit_title'))}</h2>
+          <p>${tx('home.visit_text')}</p>
           <address>THREADS Activewear &amp; Lifestyle<br>${esc(S.store_address)}${S.store_hours ? `<br><span>${esc(S.store_hours)}</span>` : ''}</address>
           <div class="cta-row">
-            <a class="btn btn-green" href="${MAP(S.store_address)}" target="_blank" rel="noopener">Get directions</a>
-            <a class="btn btn-ghost-d" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">Message us</a>
+            <a class="btn btn-green" href="${MAP(S.store_address)}" target="_blank" rel="noopener">${tx('home.visit_dir')}</a>
+            <a class="btn btn-ghost-d" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">${tx('home.visit_msg')}</a>
           </div>
         </div>
         <div class="visit-photos" aria-hidden="true">${wall.slice(3, 6).map(w => `<img src="${esc(own(w.image, w.image))}" alt="" loading="lazy">`).join('')}</div>
       </section>` : ''}
 
       ${on('faq') ? `<section class="faq">
-        <div><h2 class="h-sec">Good questions</h2><p class="sec-sub">Anything else? <a class="link" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">Ask us on WhatsApp.</a></p></div>
+        <div><h2 class="h-sec">${rich(T('home.faq_title'))}</h2><p class="sec-sub">${tx('home.faq_sub')} <a class="link" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">${tx('home.faq_link')}</a></p></div>
         <div class="faq-list">${H('faq').filter(f => f.q && (f.a || '').trim()).filter(f => S.store_address || !/\{address\}/.test(f.a)).map(f => `<details><summary>${esc(f.q)}</summary><p>${fill(f.a)}</p></details>`).join('')}</div>
       </section>` : ''}`;
 
@@ -440,12 +443,12 @@
       const name = $('#standName');
       if (brand) {
         const n = PRODUCTS.filter(x => x.brand.toLowerCase() === brand.toLowerCase()).length;
-        $('#standBrand').textContent = 'Original';
-        name.textContent = `Shop ${BRAND_NAME[brand.toLowerCase()] || brand}`;
+        $('#standBrand').textContent = T('stand.kicker');
+        name.textContent = T('stand.shop', { brand: BRAND_NAME[brand.toLowerCase()] || brand });
         const word = $('#standWord');
         if (word) { word.textContent = BRAND_NAME[brand.toLowerCase()] || brand; word.classList.remove('swap'); void word.offsetWidth; word.classList.add('swap'); }
         name.setAttribute('href', `/shop?brand=${encodeURIComponent(brand)}`);
-        $('#standPrice').textContent = n ? `${n} piece${n === 1 ? '' : 's'} in stock` : 'New pieces coming soon';
+        $('#standPrice').textContent = n ? T('stand.count', { n }) : T('stand.soon');
         return;
       }
       $('#standBrand').textContent = p.brand;
@@ -479,7 +482,7 @@
     $$('.swatch', box).forEach(b => b.onclick = () => { v = +b.dataset.v; draw(); });
     $('#liveAdd').onclick = () => {
       const p = variants[v];
-      if (!size) { $('#liveNote').textContent = 'Choose your size first.'; $('#liveSizes').animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], 260); return; }
+      if (!size) { $('#liveNote').textContent = T('pdp.choose_size'); $('#liveSizes').animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], 260); return; }
       const chosen = size;
       gate(() => addToCart(p, chosen, 1, true));
     };
@@ -514,11 +517,11 @@
     const pool = PRODUCTS.filter(p => (!gender || p.gender === gender || p.gender === 'Unisex') && (!brand || p.brand.toLowerCase() === brand.toLowerCase()));
     const cats = [...new Set(pool.map(p => p.category).filter(Boolean))].sort();
     const brandList = [...new Set([...brandNames(), ...PRODUCTS.map(p => p.brand).filter(Boolean)])];
-    const title = term ? `“${q.get('q')}”` : cat || (sale ? 'Sale' : brand || (gender || 'Shop all'));
+    const title = term ? `“${q.get('q')}”` : cat || (sale ? T('nav.sale') : brand || (gender ? T(gender === 'Women' ? 'nav.women' : 'nav.men') : T('nav.all')));
     const bkey = brand.toLowerCase(), bname = BRAND_NAME[bkey] || brand;
     const bt = (HOME.brands || []).find(b => b.name.toLowerCase() === bkey);
     const art = term ? '' : brand ? own(bt && bt.image, C(BRAND_BANNER[bkey] || 'nike-trail-run')) : gender === 'Women' ? own(HOME.women_image, C('adidas-squat')) : gender === 'Men' ? own(HOME.men_image, C('nike-run-man')) : cat === 'Shorts' ? C('nike-run-group') : cat ? C('tnf-puffer') : C('nike-trail-run');
-    const line = term ? '' : brand ? `Original ${bname}, delivered anywhere in Lebanon or waiting for you in store.` : sale ? 'Original pieces at lower prices, while sizes last.' : gender === 'Women' ? 'Sets, shorts and layers for training, running and everyday.' : gender === 'Men' ? 'Tracksuits, layers and running gear for every day you move.' : cat ? `Every ${esc(cat.toLowerCase())} on the wall right now.` : 'Everything on the wall right now, from four brands we trust.';
+    const line = term ? '' : brand ? tx('shop.line_brand', { brand: bname }) : sale ? tx('shop.line_sale') : gender === 'Women' ? tx('shop.line_women') : gender === 'Men' ? tx('shop.line_men') : cat ? tx('shop.line_cat', { category: cat.toLowerCase() }) : tx('shop.line_all');
     document.title = `${title} — THREADS`;
     const link = patch => { const n = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) v ? n.set(k, v) : n.delete(k); return '/shop' + (n.toString() ? '?' + n : ''); };
     const cols = load('th_cols', 4);
@@ -530,15 +533,15 @@
         ${line ? `<p class="shop-line">${line}</p>` : ''}
         <div class="count">${groups.length} style${groups.length === 1 ? '' : 's'} in ${list.length} colour${list.length === 1 ? '' : 's'}</div>
         <div class="chips">
-          ${['', 'Women', 'Men'].map(g => `<a class="chip ${gender === g ? 'on' : ''}" href="${link({ gender: g, category: '' })}" data-link>${g || 'Everyone'}</a>`).join('')}
+          ${['', 'Women', 'Men'].map(g => `<a class="chip ${gender === g ? 'on' : ''}" href="${link({ gender: g, category: '' })}" data-link>${g ? tx(g === 'Women' ? 'nav.women' : 'nav.men') : tx('shop.everyone')}</a>`).join('')}
           ${cats.length ? '<span class="chip-sep"></span>' : ''}
           ${cats.map(c => `<a class="chip ${cat === c ? 'on' : ''}" href="${link({ category: cat === c ? '' : c })}" data-link>${esc(c)}</a>`).join('')}
         </div>
       </div></section>
       <div class="wrap">
         <div class="toolbar">
-          <select class="select" id="fBrand" aria-label="Brand"><option value="">All brands</option>${brandList.map(b => `<option ${b.toLowerCase() === brand.toLowerCase() ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
-          <label class="toggle-chip"><input type="checkbox" id="fSale" ${sale ? 'checked' : ''}> On sale</label>
+          <select class="select" id="fBrand" aria-label="Brand"><option value="">${tx('shop.all_brands')}</option>${brandList.map(b => `<option ${b.toLowerCase() === brand.toLowerCase() ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
+          <label class="toggle-chip"><input type="checkbox" id="fSale" ${sale ? 'checked' : ''}> ${tx('shop.on_sale')}</label>
           <span class="spacer"></span>
           <div class="cols" role="group" aria-label="Products per row">${[2, 3, 4].map(n => `<button type="button" data-cols="${n}" class="${cols === n ? 'on' : ''}" aria-label="${n} per row" aria-pressed="${cols === n}">${'<i></i>'.repeat(n)}</button>`).join('')}</div>
           <select class="select" id="fSort" aria-label="Sort">
@@ -547,7 +550,7 @@
           </select>
         </div>
         ${groups.length ? `<div class="grid shop-grid" id="shopGrid" style="--cols:${cols}">${groups.map(g => card(g)).join('')}</div>` :
-          `<div class="empty"><h3>${gender === 'Men' && !brand && !cat ? "Men's drop landing soon" : 'Nothing here yet'}</h3><p>${gender === 'Men' && !brand && !cat ? 'New pieces are on the way. Follow us on Instagram to see them first.' : brand ? `${esc(bname)} is coming to THREADS soon. Message us on WhatsApp and we will tell you when it lands.` : 'Try another filter.'}</p><a href="/shop" data-link class="btn btn-dark">See everything</a></div>`}
+          `<div class="empty"><h3>${gender === 'Men' && !brand && !cat ? tx('shop.empty_men_t') : tx('shop.empty')}</h3><p>${gender === 'Men' && !brand && !cat ? tx('shop.empty_men') : brand ? tx('shop.empty_brand', { brand: bname }) : tx('shop.empty_text')}</p><a href="/shop" data-link class="btn btn-dark">${tx('shop.see_all')}</a></div>`}
       </div>`;
     $('#fBrand').onchange = e => go(link({ brand: e.target.value }), true);
     $$('[data-cols]').forEach(b => b.onclick = () => { const n = +b.dataset.cols; save('th_cols', n); $('#shopGrid') && $('#shopGrid').style.setProperty('--cols', n); $$('[data-cols]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); });
@@ -592,22 +595,22 @@
             ${p.stock > 0 ? `
             <div class="buy-row">
               <div class="qty"><button id="qMinus" aria-label="Less">−</button><span id="qVal">1</span><button id="qPlus" aria-label="More">+</button></div>
-              <button class="btn btn-green" id="addBtn">Add to bag, ${money(priceOf(p))}</button>
-            </div>` : `<button class="btn btn-dark btn-block" disabled style="margin-top:18px">Sold out</button>`}
-            <a class="btn btn-wa btn-block wa-row" data-gate target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${waText}">${ICON.wa} ${p.stock > 0 ? 'Ask about this on WhatsApp' : "Ask when it's back"}</a>
+              <button class="btn btn-green" id="addBtn">${tx('pdp.add', { price: money(priceOf(p)) })}</button>
+            </div>` : `<button class="btn btn-dark btn-block" disabled style="margin-top:18px">${tx('pdp.sold_out')}</button>`}
+            <a class="btn btn-wa btn-block wa-row" data-gate target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${waText}">${ICON.wa} ${p.stock > 0 ? tx('pdp.wa') : tx('pdp.wa_back')}</a>
             <div class="pdp-perks">
-              <div>${ICON.cash} Pay cash on delivery — no card needed</div>
-              <div>${ICON.truck} Delivery all over Lebanon${Number(S.free_delivery_over) ? `, free over ${money(S.free_delivery_over)}` : ''}</div>
-              <div>${ICON.shield} 100% original ${esc(p.brand)}</div>
+              <div>${ICON.cash} ${tx('pdp.perk1')}</div>
+              <div>${ICON.truck} ${tx('pdp.perk2', { free: Number(S.free_delivery_over) ? `, free over ${money(S.free_delivery_over)}` : '' })}</div>
+              <div>${ICON.shield} ${tx('pdp.perk3', { brand: p.brand })}</div>
             </div>
-            ${p.description ? `<details class="acc" open><summary>Details</summary><div>${esc(p.description)}</div></details>` : ''}
-            <details class="acc"><summary>Delivery &amp; payment</summary><div>We deliver all over Lebanon. Delivery fee is ${money(S.delivery_fee)}${Number(S.free_delivery_over) ? `, free on orders over ${money(S.free_delivery_over)}` : ''}.\nYou pay in cash when your order arrives. We'll call or WhatsApp you to confirm before shipping.</div></details>
-            <details class="acc"><summary>Size exchanges</summary><div>Not the right fit? Message us on WhatsApp within a few days of delivery and we'll arrange a size swap (item unworn, tags on).</div></details>
+            ${p.description ? `<details class="acc" open><summary>${tx('pdp.details')}</summary><div>${esc(p.description)}</div></details>` : ''}
+            <details class="acc"><summary>${tx('pdp.delivery_t')}</summary><div>${tx('pdp.delivery', { fee: money(S.delivery_fee), free: Number(S.free_delivery_over) ? `, free on orders over ${money(S.free_delivery_over)}` : '' })}</div></details>
+            <details class="acc"><summary>${tx('pdp.swap_t')}</summary><div>${tx('pdp.swap')}</div></details>
           </div>
         </div>
       </div>
       ${relatedGroups.length ? `<section class="rail-sec">
-        <div class="sec-row"><h2 class="h-sec">You may also like</h2><a class="link" href="/shop" data-link>View all</a></div>
+        <div class="sec-row"><h2 class="h-sec">${rich(T('pdp.related'))}</h2><a class="link" href="/shop" data-link>${tx('home.rail_link')}</a></div>
         <div class="rail" id="rail">${relatedGroups.map(g => card(g)).join('')}</div>
         <div class="rail-btns"><button type="button" class="icon-btn" data-rail="-1" aria-label="Scroll left"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button type="button" class="icon-btn" data-rail="1" aria-label="Scroll right"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div>
       </section>` : ''}
@@ -615,8 +618,8 @@
         ${pic(BRAND_BANNER[bkey], '', '100vw')}
         <div class="banner-copy">
           <h2>More <em>${esc(bname)}</em></h2>
-          <p>${inBrand} ${inBrand === 1 ? 'piece' : 'pieces'} from ${esc(bname)} in stock now. Original, delivered anywhere in Lebanon, paid in cash at your door.</p>
-          <div class="cta-row"><a class="btn btn-green" href="/shop?brand=${encodeURIComponent(p.brand)}" data-link>Shop ${esc(bname)}</a></div>
+          <p>${tx('pdp.more_text', { n: inBrand, brand: bname })}</p>
+          <div class="cta-row"><a class="btn btn-green" href="/shop?brand=${encodeURIComponent(p.brand)}" data-link>${tx('stand.shop', { brand: bname })}</a></div>
         </div>
       </section>` : ''}`;
 
@@ -652,7 +655,7 @@
       $('#qPlus').onclick = () => { qty = Math.min(sel ? stockOf(sel) : 10, qty + 1, 20); $('#qVal').textContent = qty; };
       $('#addBtn').onclick = () => {
         if (!sel) {
-          $('#sizeNote').textContent = 'Please choose your size';
+          $('#sizeNote').textContent = T('pdp.choose_size');
           $('.sizes').animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'translateX(-3px)' }, { transform: 'none' }], 300);
           $('.sizes').scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
@@ -731,10 +734,10 @@
   }
   function renderDrawer() {
     const { lines, sub, fee, total, freeOver, count } = totals();
-    $('#drawerTitle').innerHTML = `Your bag${count ? ` <small>${count} item${count > 1 ? 's' : ''}</small>` : ''}`;
+    $('#drawerTitle').innerHTML = `${tx('bag.title')}${count ? ` <small>${count} item${count > 1 ? 's' : ''}</small>` : ''}`;
     if (!lines.length) {
-      $('#drawerBody').innerHTML = `<div class="drawer-empty"><h3>Your bag is empty</h3><p>Find your next favorite fit.</p></div>`;
-      $('#drawerFoot').innerHTML = `<a href="/shop" data-link class="btn btn-dark btn-block">Start shopping</a>`;
+      $('#drawerBody').innerHTML = `<div class="drawer-empty"><h3>${tx('bag.empty_t')}</h3><p>${tx('bag.empty')}</p></div>`;
+      $('#drawerFoot').innerHTML = `<a href="/shop" data-link class="btn btn-dark btn-block">${tx('bag.start')}</a>`;
       return;
     }
     $('#drawerBody').innerHTML = lines.map((l, i) => `
@@ -746,12 +749,12 @@
       </div>`).join('');
     const left = freeOver - sub;
     $('#drawerFoot').innerHTML = `
-      ${freeOver ? `<div class="free-bar">${left > 0 ? `You're <b>${money(left)}</b> away from free delivery` : '<b>Free delivery</b> unlocked'}
+      ${freeOver ? `<div class="free-bar">${left > 0 ? tx('bag.free_left', { amount: '\u0000' }).replace('\u0000', `<b>${money(left)}</b>`) : `<b>${tx('bag.free_done')}</b>`}
         <div class="track"><div class="fill" style="width:${Math.min(100, sub / freeOver * 100)}%"></div></div></div>` : ''}
       <div class="sum-row"><span>Subtotal</span><span>${money(sub)}</span></div>
       <div class="sum-row"><span>Delivery</span><span>${fee ? money(fee) : 'Free'}</span></div>
       <div class="sum-row total"><span>Total</span><span>${money(total)}</span></div>
-      <a href="/checkout" data-link class="btn btn-green btn-block">Checkout and pay on delivery</a>`;
+      <a href="/checkout" data-link class="btn btn-green btn-block">${tx('bag.checkout')}</a>`;
     const lineAt = i => cart.find(c => c.id === lines[i].id && c.size === lines[i].size);
     $$('[data-inc]').forEach(b => b.onclick = () => { const l = lineAt(b.dataset.inc); l.qty = Math.min(lines[b.dataset.inc].max, l.qty + 1); afterCart(); });
     $$('[data-dec]').forEach(b => b.onclick = () => { const l = lineAt(b.dataset.dec); l.qty = Math.max(1, l.qty - 1); afterCart(); });
@@ -771,7 +774,7 @@
     setOver(false);
     document.title = 'Checkout — THREADS';
     const { lines, sub, fee, total } = totals();
-    if (!lines.length) { app.innerHTML = `<div class="wrap empty"><h3>Your bag is empty</h3><a href="/shop" data-link class="btn btn-dark">Go shopping</a></div>`; return; }
+    if (!lines.length) { app.innerHTML = `<div class="wrap empty"><h3>${tx('bag.empty_t')}</h3><a href="/shop" data-link class="btn btn-dark">Go shopping</a></div>`; return; }
     const saved = load('th_customer', {});
     const cities = (S.cities || '').split(',').map(c => c.trim()).filter(Boolean);
     const existing = $('#coForm') ? Object.fromEntries(new FormData($('#coForm'))) : null;
@@ -779,23 +782,23 @@
     app.innerHTML = `
       <div class="wrap co">
         <form id="coForm" novalidate>
-          <h1 class="split-me">Checkout</h1><p style="color:var(--muted);margin:0 0 24px">No account needed. Pay cash when your order arrives.</p>
+          <h1 class="split-me">${tx('co.title')}</h1><p style="color:var(--muted);margin:0 0 24px">${tx('co.sub')}</p>
           <div id="coErr"></div>
-          <div class="panel"><h3><span class="n">1</span> Your details</h3>
+          <div class="panel"><h3><span class="n">1</span> ${tx('co.details')}</h3>
             <label class="field"><span>Full name</span><input class="input" name="name" autocomplete="name" required value="${v('name')}"></label>
             <div class="f2">
               <label class="field"><span>Phone (WhatsApp)</span><input class="input" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+961 70 123 456" required value="${v('phone')}"></label>
               <label class="field"><span>Email <small style="color:var(--muted);font-weight:400">(optional)</small></span><input class="input" name="email" type="email" autocomplete="email" value="${v('email')}"></label>
             </div>
           </div>
-          <div class="panel"><h3><span class="n">2</span> Delivery address</h3>
+          <div class="panel"><h3><span class="n">2</span> ${tx('co.address')}</h3>
             <label class="field"><span>Area</span><select class="input" name="city" required>
               <option value="">Choose your area</option>${cities.map(c => `<option ${(existing || saved).city === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
             <label class="field"><span>Full address</span><textarea class="input" name="address" autocomplete="street-address" placeholder="Town, street, building, floor, nearby landmark" required>${v('address')}</textarea></label>
             <label class="field" style="margin:0"><span>Notes <small style="color:var(--muted);font-weight:400">(optional)</small></span><input class="input" name="notes" placeholder="Best time to call, etc." value="${v('notes')}"></label>
           </div>
-          <div class="panel"><h3><span class="n">3</span> Payment</h3>
-            <div class="pay-opt"><span class="radio"></span><div><b>Cash on delivery</b><small>Pay ${money(total)} in cash when you receive your order.</small></div>${ICON.cash}</div>
+          <div class="panel"><h3><span class="n">3</span> ${tx('co.payment')}</h3>
+            <div class="pay-opt"><span class="radio"></span><div><b>${tx('co.cod')}</b><small>${tx('co.cod_text', { total: money(total) })}</small></div>${ICON.cash}</div>
           </div>
         </form>
         <aside class="co-summary panel">
@@ -806,7 +809,7 @@
           <div class="sum-row"><span>Subtotal</span><span>${money(sub)}</span></div>
           <div class="sum-row"><span>Delivery</span><span>${fee ? money(fee) : 'Free'}</span></div>
           <div class="sum-row total"><span>Total</span><span>${money(total)}</span></div>
-          <button class="btn btn-green btn-block" id="placeBtn" form="coForm" type="submit">Place order, ${money(total)}</button>
+          <button class="btn btn-green btn-block" id="placeBtn" form="coForm" type="submit">${tx('co.place', { total: money(total) })}</button>
           <div class="trust"><span>${ICON.lock} Secure</span><span>${ICON.cash} Pay on delivery</span><span>${ICON.shield} 100% original</span></div>
         </aside>
       </div>`;
@@ -826,7 +829,7 @@
         go(`/order/${o.number}`, true);
       } catch (err) {
         $('#coErr').innerHTML = `<div class="form-err">${esc(err.message)}</div>`;
-        btn.disabled = false; btn.textContent = `Place order, ${money(total)}`;
+        btn.disabled = false; btn.textContent = T('co.place', { total: money(total) });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -837,11 +840,12 @@
     document.title = 'Privacy Policy — THREADS';
     app.innerHTML = `<div class="wrap legal">
       <h1>Privacy Policy</h1>
-      <p>THREADS Activewear &amp; Lifestyle (Lebanon) respects your privacy. This page explains what we collect and why.</p>
-      <h3>What we collect</h3><p>When you join the THREADS community or place an order we collect your name, family name, email address, country, phone number and, for orders, your delivery address.</p>
-      <h3>How we use it</h3><p>To process and deliver your orders, contact you about them (by phone or WhatsApp), and — only if you ticked the box — send you offers and new arrivals. We may use your details to show you relevant THREADS ads on social media.</p>
-      <h3>Sharing</h3><p>We never sell your data. We only share what is needed with our delivery partners to get your order to you.</p>
-      <h3>Your choices</h3><p>You can ask us at any time to update or delete your details, or to stop marketing messages, by contacting us on <a href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener" style="text-decoration:underline">WhatsApp</a> or <a href="${esc(S.instagram)}" target="_blank" rel="noopener" style="text-decoration:underline">Instagram</a>.</p>
+      <p>${tx('privacy.intro')}</p>
+      <h3>What we collect</h3><p>${tx('privacy.collect')}</p>
+      <h3>How we use it</h3><p>${tx('privacy.use')}</p>
+      <h3>Sharing</h3><p>${tx('privacy.share')}</p>
+      <h3>Your choices</h3><p>${tx('privacy.choices')}</p>
+      <p><a href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener" style="text-decoration:underline">WhatsApp</a> · <a href="${esc(S.instagram)}" target="_blank" rel="noopener" style="text-decoration:underline">Instagram</a></p>
     </div>`;
   }
 
@@ -865,13 +869,13 @@
     }
     app.innerHTML = `<div class="wrap done">
       <div class="done-badge">${ICON.check}</div>
-      <h1>You're all set${mine ? ', ' + esc(o.customer.name.split(' ')[0]) : ''}!</h1>
+      <h1>${tx('done.title')}${mine ? ', ' + esc(o.customer.name.split(' ')[0]) : ''}!</h1>
       <div class="num">Order ${esc(num)}</div>
-      <p>${mine ? `Have <b>${money(o.total)}</b> in cash ready on delivery.` : ''}</p>
+      <p>${mine ? tx('done.cash', { total: money(o.total) }) : ''}</p>
       <ol class="steps-done">
-        <li><b>Confirm</b>We call or message you on ${mine ? `<b>${esc(o.customer.phone)}</b>` : 'your phone'} to confirm.</li>
-        <li><b>Deliver</b>Your order is packed and handed to our driver.</li>
-        <li><b>Pay</b>Pay cash at your door when it arrives.</li>
+        <li><b>${tx('home.step2_t')}</b>${tx('done.confirm', { phone: mine ? o.customer.phone : 'your phone' })}</li>
+        <li><b>${tx('home.step3_t')}</b>${tx('done.deliver')}</li>
+        <li><b>${tx('home.step4_t')}</b>${tx('done.pay')}</li>
       </ol>
       <div class="cta-row">
         <a class="btn btn-wa" target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${wa}">${ICON.wa} Message us</a>
@@ -917,7 +921,7 @@
     const m = $('#welcome');
     $('#welcomeStep1').hidden = !!action;
     $('#welcomeForm').hidden = !action;
-    $('#wHint').textContent = hint || 'Fill in your details to continue with your shopping activity.';
+    $('#wHint').textContent = hint || T('pop.hint');
     $('#wErr').textContent = '';
     m.hidden = false; lockScroll(true);
     if (action) setTimeout(() => $('#welcomeForm input').focus(), 60);
@@ -965,7 +969,7 @@
         save('th_customer', { ...c, name: c.name || `${body.first_name} ${body.last_name}`, phone: c.phone || body.phone, email: c.email || body.email });
         const fn = pending; pending = null;
         $('#welcome').hidden = true; lockScroll(false);
-        toast(`Welcome to THREADS, ${esc(body.first_name)}!`);
+        toast(tx('pop.welcome', { name: body.first_name }));
         if (fn) fn();
       } catch (err) { $('#wErr').textContent = err.message; }
       $('#wSubmit').disabled = false;
@@ -996,6 +1000,12 @@
       [S, PRODUCTS] = await Promise.all([api('/api/settings'), api('/api/products')]);
     } catch { app.innerHTML = '<div class="wrap empty"><h3>Could not load the store</h3><p>Please refresh the page.</p></div>'; return; }
     try { HOME = JSON.parse(S.home || '{}'); } catch { HOME = {}; }
+    try { TX = JSON.parse(S.texts || '{}') || {}; } catch { TX = {}; }
+    // the header, footer, popup and size guide are in index.html: fill their words and pictures
+    $$('[data-t]').forEach(el => { el.textContent = T(el.dataset.t); });
+    $$('[data-t-ph]').forEach(el => { el.placeholder = T(el.dataset.tPh); });
+    $$('[data-img]').forEach(el => { const u = TX[el.dataset.img]; if (u && u.trim()) el.src = u; });
+    const md = $('meta[name="description"]'); if (md) md.content = T('meta.description');
     $('#announce').textContent = S.announcement || '';
     const wa = `https://wa.me/${S.whatsapp}`;
     ['#footWa', '#footWaBtn', '#mmWa'].forEach(s => $(s).href = wa);
