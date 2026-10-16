@@ -10,7 +10,8 @@ const KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const BUCKET = 'media';
 const remote = !!(SB && KEY);
 const PUBLIC = `${SB}/storage/v1/object/public/${BUCKET}/`;
-const auth = { Authorization: `Bearer ${KEY}`, apikey: KEY };
+// the newer sb_secret_ keys go in apikey only; the older service_role keys (JWTs) also as a Bearer token
+const auth = KEY.startsWith('sb_') ? { apikey: KEY } : { Authorization: `Bearer ${KEY}`, apikey: KEY };
 
 let bucket;
 const ensureBucket = () => bucket ||= fetch(`${SB}/storage/v1/bucket`, {
