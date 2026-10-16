@@ -81,6 +81,14 @@ function rateLimit(key, max, windowMs) {
   return list.length > max;
 }
 
+// photos kept in the database (when Supabase Storage isn't set up): cached for a year, names never change
+app.get('/media/:name', wrap(async (req, res) => {
+  const m = await media.read(req.params.name);
+  if (!m) return res.status(404).end();
+  res.setHeader('Cache-Control', 'public, max-age=31536000, s-maxage=31536000, immutable');
+  res.type(m.type).send(Buffer.from(m.data));
+}));
+
 // ---------- public API ----------
 const ACTIVE = 'SELECT * FROM products WHERE active = 1 ORDER BY featured DESC, created_at DESC, id DESC';
 app.get('/api/settings', wrap(async (req, res) => {
