@@ -2,3 +2,4 @@ data/
 dist/
 models-preview/
 .env
+.env.local

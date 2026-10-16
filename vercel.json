@@ -1,19 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "buildCommand": "",
-  "installCommand": "npm install",
-  "outputDirectory": "public",
-  "functions": {
-    "api/index.js": { "maxDuration": 60, "memory": 1024 }
+  "services": {
+    "threads-store": { "root": ".", "framework": "express", "entrypoint": "server.js" }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api?_p=:path*" },
-    { "source": "/admin", "destination": "/admin/index.html" },
-    { "source": "/admin/:path*", "destination": "/admin/index.html" },
-    { "source": "/:path*", "destination": "/index.html" }
-  ],
-  "headers": [
-    { "source": "/(products|campaign|instore|brand)/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+    { "source": "/(.*)", "destination": { "service": "threads-store" } }
   ]
 }

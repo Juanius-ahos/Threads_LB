@@ -21,6 +21,7 @@ const ensureBucket = () => bucket ||= fetch(`${SB}/storage/v1/bucket`, {
 
 async function save(name, buffer, type = 'image/webp') {
   if (!remote) {
+    if (process.env.VERCEL) throw new Error('Photo upload failed: photo storage is not connected yet (SUPABASE_SERVICE_KEY is missing on Vercel).');
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     await fs.promises.writeFile(path.join(UPLOAD_DIR, name), buffer);
     return `/uploads/${name}`;

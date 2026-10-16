@@ -75,7 +75,7 @@ node scripts/import-file.js "products.xlsx"
 ## Files
 
 ```
-server.js          API + pages (also the Vercel function, via api/index.js)
+server.js          API + pages (Vercel runs it as an Express service, see vercel.json)
 src/db.js          Postgres (Supabase, or embedded in data/pg), settings, demo products
 src/media.js       uploaded photos: Supabase Storage, or data/uploads
 src/excel.js       Excel import/export

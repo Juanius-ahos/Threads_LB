@@ -452,10 +452,13 @@ app.put('/api/admin/settings', wrap(async (req, res) => {
 }));
 
 // ---------- pages ----------
-app.get(['/admin', '/admin/*'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
+// read once and sent from memory: on Vercel the public/ files sit on the CDN, not next to this function
+const PAGE = require('fs').readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+const ADMIN_PAGE = require('fs').readFileSync(path.join(__dirname, 'public', 'admin', 'index.html'), 'utf8');
+app.get(['/admin', '/admin/*'], (req, res) => res.type('html').send(ADMIN_PAGE));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  res.type('html').send(PAGE);
 });
 
 app.use((err, req, res, next) => {
