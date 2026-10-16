@@ -72,6 +72,18 @@
   const tx = (k, vars) => esc(T(k, vars));
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+  // ---------- Google Tag Manager events (GA4 ecommerce names) ----------
+  // The store is one page, so page changes and shop actions are pushed to the dataLayer for GTM to pick up.
+  window.dataLayer = window.dataLayer || [];
+  const CUR = () => ({ $: 'USD', '€': 'EUR', '£': 'GBP' })[S.currency] || 'USD';
+  const gaItem = (p, size, qty = 1) => ({ item_id: p.sku, item_name: p.name, item_brand: p.brand, item_category: p.category, item_variant: [p.color, size].filter(Boolean).join(' / '), price: priceOf(p), quantity: qty });
+  function track(event, data) {
+    try {
+      if (data && data.ecommerce) window.dataLayer.push({ ecommerce: null });   // GA4: clear the previous ecommerce object
+      window.dataLayer.push({ event, ...data });
+    } catch {}
+  }
+
   function toast(html, img) {
     const t = $('#toast');
     t.innerHTML = (img ? `<img src="${esc(img)}" alt="">` : '') + `<span>${html}</span>`;
@@ -218,6 +230,7 @@
     else { setOver(false); app.innerHTML = `<div class="wrap empty"><h3>Page not found</h3><a href="/" data-link class="btn btn-dark">Back home</a></div>`; }
     reveal();
     if (window.FX) FX.enter(path, app);
+    track('page_view', { page_path: path + location.search, page_location: location.href, page_title: document.title });
   }
 
   // ---------- home ----------
@@ -564,6 +577,7 @@
     const p = PRODUCTS.find(x => x.slug === slug);
     if (!p) { app.innerHTML = `<div class="wrap empty"><h3>Not available</h3><p>This product may have sold out or been removed.</p><a href="/shop" data-link class="btn btn-dark">Back to shop</a></div>`; return; }
     document.title = `${p.brand} ${p.name} — ${p.color} — THREADS`;
+    track('view_item', { ecommerce: { currency: CUR(), value: priceOf(p), items: [gaItem(p)] } });
     const sibs = groupsOf(siblings(p))[0];
     let sel = p.sizes.length === 1 && p.sizes[0].stock > 0 ? p.sizes[0].size : null, qty = 1;
     const relatedGroups = groupsOf(PRODUCTS.filter(x => gkey(x) !== gkey(p) && (x.category === p.category || x.brand === p.brand || x.gender === p.gender))).slice(0, 8);
@@ -720,6 +734,7 @@
     if (!s || s.stock <= 0) return;
     const ex = cart.find(l => l.id === p.id && l.size === size);
     if (ex) ex.qty = Math.min(s.stock, ex.qty + qty); else cart.push({ id: p.id, size, qty: Math.min(qty, s.stock) });
+    track('add_to_cart', { ecommerce: { currency: CUR(), value: priceOf(p) * qty, items: [gaItem(p, size, qty)] } });
     save('th_cart', cart);
     updateBadge(true);
     if (openBag) openDrawer();
@@ -776,6 +791,7 @@
     const { lines, sub, fee, total } = totals();
     if (!lines.length) { app.innerHTML = `<div class="wrap empty"><h3>${tx('bag.empty_t')}</h3><a href="/shop" data-link class="btn btn-dark">Go shopping</a></div>`; return; }
     const saved = load('th_customer', {});
+    if (!$('#coForm')) track('begin_checkout', { ecommerce: { currency: CUR(), value: total, items: lines.map(l => gaItem(l.p, l.size, l.qty)) } });
     const cities = (S.cities || '').split(',').map(c => c.trim()).filter(Boolean);
     const existing = $('#coForm') ? Object.fromEntries(new FormData($('#coForm'))) : null;
     const v = k => esc((existing || saved)[k] || '');
@@ -832,6 +848,8 @@
       try {
         const o = await api('/api/orders', { method: 'POST', body: JSON.stringify({ customer: f, items: cart }) });
         const order = { ...o, customer: f };
+        track('purchase', { ecommerce: { transaction_id: o.number, currency: CUR(), value: o.total, shipping: o.delivery_fee || 0, payment_type: 'Cash on delivery',
+          items: lines.map(l => gaItem(l.p, l.size, l.qty)) } });
         if (waWin && !waWin.closed) { waWin.location.href = orderWa(order); order.waOpened = true; }
         save('th_customer', { name: f.name, phone: f.phone, email: f.email, city: f.city, address: f.address });
         save('th_last_order', order);
@@ -990,6 +1008,7 @@
       $('#wSubmit').disabled = true;
       try {
         await api('/api/subscribe', { method: 'POST', body: JSON.stringify(body) });
+        track('sign_up', { method: 'Welcome popup', marketing_ok: !!body.marketing });
         member = body; save('th_member', member);
         // pre-fill checkout with what they just told us
         const c = load('th_customer', {});
