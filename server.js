@@ -22,6 +22,31 @@ app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const PUBLIC_SETTINGS = ['store_name', 'currency', 'delivery_fee', 'free_delivery_over', 'whatsapp', 'instagram', 'announcement', 'store_address', 'store_hours', 'welcome_popup', 'require_signup', 'cities', 'home', 'texts'];
 const BIG_SETTINGS = { home: 60000, texts: 60000 };
+// admin-only settings: saved from Settings, never sent to the store
+const PRIVATE_SETTINGS = ['notify_phone', 'callmebot_key'];
+
+// A WhatsApp message to the owner's own phone through CallMeBot (free; the owner activates it once and gets a key).
+// Never blocks or fails an order: at most 5 seconds, errors only logged.
+async function alertOwner(s, text) {
+  const phone = String(s.notify_phone || '').replace(/\D/g, ''), key = String(s.callmebot_key || '').trim();
+  if (!phone || !key) return { sent: false, why: 'not set up' };
+  const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const r = await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&apikey=${encodeURIComponent(key)}&text=${encodeURIComponent(text)}`, { signal: ctrl.signal });
+    const body = (await r.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const ok = r.ok && !/error|invalid|not (allowed|activated)/i.test(body);
+    if (!ok) console.error('Order alert not sent:', body.slice(0, 200));
+    return { sent: ok, why: ok ? '' : body.slice(0, 160) };
+  } catch (e) { console.error('Order alert not sent:', e.message); return { sent: false, why: e.message }; }
+  finally { clearTimeout(t); }
+}
+const orderAlert = (o, c, s) => [
+  `🛍️ New order ${o.number} on the website`,
+  ...o.items.map(i => `${i.qty} x ${i.brand} ${i.name}, size ${i.size}: ${s.currency || '$'}${i.price * i.qty}`),
+  `Total: ${s.currency || '$'}${o.total} cash on delivery`,
+  `${c.name} · ${c.phone} · ${c.city || ''}`,
+  `${c.address || ''}`,
+].join('\n');
 
 async function saveImage(buffer, wide) {
   const name = `${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.webp`;
@@ -170,6 +195,7 @@ app.post('/api/orders', wrap(async (req, res) => {
       await t.run('UPDATE orders SET number = ? WHERE id = ?', number, ins.id);
       return { number, total: subtotal + fee, subtotal, delivery_fee: fee, items };
     });
+    await alertOwner(s, orderAlert(order, { ...c, name, phone, address }, s));
     res.json(order);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -434,6 +460,13 @@ app.delete('/api/admin/orders/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// send a test alert to the owner's phone (Settings → Order alerts)
+app.post('/api/admin/test-alert', wrap(async (req, res) => {
+  const r = await alertOwner(await getSettings(), '✅ THREADS website: order alerts are working. You will get a message like this for every new order.');
+  if (!r.sent) return res.status(400).json({ error: r.why === 'not set up' ? 'Add your WhatsApp number and CallMeBot key first, then Save.' : `CallMeBot said: ${r.why}` });
+  res.json({ ok: true });
+}));
+
 // Community sign-ups
 app.get('/api/admin/subscribers', wrap(async (req, res) => res.json(await all('SELECT * FROM subscribers ORDER BY id DESC'))));
 app.get('/api/admin/subscribers.xlsx', wrap(async (req, res) => {
@@ -450,7 +483,7 @@ app.get('/api/admin/settings', wrap(async (req, res) => {
 }));
 app.put('/api/admin/settings', wrap(async (req, res) => {
   const b = req.body || {};
-  for (const k of PUBLIC_SETTINGS) if (k in b) await setSetting(k, String(b[k]).slice(0, BIG_SETTINGS[k] || 1000));
+  for (const k of [...PUBLIC_SETTINGS, ...PRIVATE_SETTINGS]) if (k in b) await setSetting(k, String(b[k]).slice(0, BIG_SETTINGS[k] || 1000));
   if (b.new_password) {
     if (process.env.ADMIN_PASSWORD) return res.status(400).json({ error: 'The password is set on the host (ADMIN_PASSWORD). Change it there.' });
     if (String(b.new_password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });

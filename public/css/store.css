@@ -929,3 +929,4 @@ html:has(.drawer.open) .wa-float, html:has(.mmenu.open) .wa-float, html:has(.mod
 /* phones: the logo sits in the middle, so Instagram lives in the menu and the footer */
 @media (max-width: 640px) { .ig-btn { display: none; } }
 .mmenu-foot .mmenu-ig { display: flex; width: fit-content; text-decoration: none; }
+.done-wa-hint { margin: 22px auto 0; font-weight: 600; }

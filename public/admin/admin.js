@@ -675,6 +675,16 @@
           <label class="toggle"><div><b>Welcome popup</b><small>Invite visitors to join when they arrive (they can skip and browse)</small></div><span class="switch"><input type="checkbox" name="welcome_popup" ${s.welcome_popup === '1' ? 'checked' : ''}><i></i></span></label>
           <label class="toggle"><div><b>Ask for details before shopping</b><small>Name, family name, email, country &amp; phone required before add to bag, checkout or WhatsApp enquiries</small></div><span class="switch"><input type="checkbox" name="require_signup" ${s.require_signup !== '0' ? 'checked' : ''}><i></i></span></label>
         </div>
+        <div class="card card-pad"><h3>Order alerts on WhatsApp</h3>
+          <p class="hint" style="margin:0 0 12px">Get a WhatsApp message on your phone for every new order. It's free, set it up once:<br>
+            1. Open <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener" style="text-decoration:underline">callmebot.com</a>, add their WhatsApp number to your contacts and send it the activation message they show.<br>
+            2. They reply on WhatsApp with your <b>API key</b>. Paste it below with your number, Save, then press Send test.</p>
+          <div class="g2">
+            <label class="field"><span>Your WhatsApp number <small>(gets the alerts)</small></span><input class="input" name="notify_phone" value="${esc(s.notify_phone || '')}" placeholder="+961 71 043 048" inputmode="tel"></label>
+            <label class="field"><span>CallMeBot API key</span><input class="input" name="callmebot_key" value="${esc(s.callmebot_key || '')}" placeholder="e.g. 1234567" autocomplete="off"></label>
+          </div>
+          <button type="button" class="btn btn-light" id="testAlert">Send test</button>
+        </div>
         <div class="card card-pad"><h3>Admin password</h3>
           <label class="field" style="margin:0"><span>New password <small>(leave empty to keep the current one)</small></span><input class="input" name="new_password" type="password" autocomplete="new-password" minlength="6"></label>
         </div>
@@ -689,6 +699,14 @@
       body.whatsapp = (body.whatsapp || '').replace(/\D/g, '');
       try { await api('/api/admin/settings', { method: 'PUT', body }); SET = { ...SET, ...body }; f.new_password.value = ''; toast('Settings saved'); }
       catch (err) { toast(err.message, 1); }
+    };
+    $('#testAlert').onclick = async () => {
+      const b = $('#testAlert'); b.disabled = true; b.textContent = 'Sending…';
+      try {
+        await api('/api/admin/settings', { method: 'PUT', body: { notify_phone: f.notify_phone.value, callmebot_key: f.callmebot_key.value } });
+        await api('/api/admin/test-alert', { method: 'POST' }); toast('Sent! Check WhatsApp on that phone');
+      } catch (err) { toast(err.message, 1); }
+      b.disabled = false; b.textContent = 'Send test';
     };
   }
 

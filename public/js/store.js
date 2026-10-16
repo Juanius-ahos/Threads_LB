@@ -854,7 +854,16 @@
     const o = load('th_last_order', null);
     const mine = o && o.number === num;
     document.title = 'Order placed — THREADS';
-    const wa = encodeURIComponent(mine ? `Hi THREADS! I just placed order ${num} (${money(o.total)}). Name: ${o.customer.name}` : `Hi THREADS! About my order ${num}`);
+    // the whole order as a WhatsApp message to the shop, so the owner sees it on the phone straight away
+    const orderText = mine ? [
+      `New order ${num}`,
+      ...(o.items || []).map(i => `${i.qty} x ${i.brand ? i.brand + ' ' : ''}${i.name}${i.color ? ', ' + i.color : ''}, size ${i.size}: ${money(i.price * i.qty)}`),
+      `Delivery: ${o.delivery_fee ? money(o.delivery_fee) : 'free'}`,
+      `Total cash on delivery: ${money(o.total)}`, '',
+      `Name: ${o.customer.name}`, `Phone: ${o.customer.phone}`, `Area: ${o.customer.city || ''}`, `Address: ${o.customer.address || ''}`,
+      o.customer.notes ? `Notes: ${o.customer.notes}` : '',
+    ].filter(x => x !== '').join('\n') : `Hi THREADS! About my order ${num}`;
+    const wa = encodeURIComponent(orderText);
     if (mine && o.via === 'whatsapp') {
       app.innerHTML = `<div class="wrap done">
         <div class="done-badge">${ICON.check}</div>
@@ -877,9 +886,10 @@
         <li><b>${tx('home.step3_t')}</b>${tx('done.deliver')}</li>
         <li><b>${tx('home.step4_t')}</b>${tx('done.pay')}</li>
       </ol>
+      ${mine ? `<p class="done-wa-hint">${tx('done.wa_hint')}</p>` : ''}
       <div class="cta-row">
-        <a class="btn btn-wa" target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${wa}">${ICON.wa} Message us</a>
-        <a class="btn btn-dark" href="/shop" data-link>Keep shopping</a>
+        <a class="btn btn-green" target="_blank" rel="noopener" href="https://wa.me/${esc(S.whatsapp)}?text=${wa}">${ICON.wa} ${mine ? tx('done.wa_btn') : tx('home.visit_msg')}</a>
+        <a class="btn btn-outline" href="/shop" data-link>Keep shopping</a>
       </div></div>`;
   }
 
