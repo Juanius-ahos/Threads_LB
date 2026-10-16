@@ -1008,8 +1008,12 @@
     const md = $('meta[name="description"]'); if (md) md.content = T('meta.description');
     $('#announce').textContent = S.announcement || '';
     const wa = `https://wa.me/${S.whatsapp}`;
-    ['#footWa', '#footWaBtn', '#mmWa'].forEach(s => $(s).href = wa);
-    $('#footIg').href = S.instagram || '#';
+    ['#footWa', '#footWaBtn', '#mmWa', '#footWaIcon'].forEach(s => $(s).href = wa);
+    ['#footIg', '#footIgIcon', '#navIg', '#mmIg'].forEach(s => { $(s).href = S.instagram || '#'; $(s).hidden = !S.instagram; });
+    // "+961 71 043 048" from 96171043048
+    $('#footWaNum').textContent = String(S.whatsapp || '').replace(/^961(\d{1,2})(\d{3})(\d{3})$/, '+961 $1 $2 $3').replace(/^(\d+)$/, '+$1');
+    const wf = $('#waFloat');
+    if (S.whatsapp) { wf.href = `${wa}?text=${encodeURIComponent(T('wa.message'))}`; wf.hidden = false; }
     const addr = S.store_address || '';
     ['#footMap', '#footMapBtn'].forEach(id => { $(id).href = MAP(addr); $(id).hidden = !addr; });
     $('#fAddress').innerHTML = addr ? `THREADS Activewear &amp; Lifestyle<br>${esc(addr)}${S.store_hours ? `<br>${esc(S.store_hours)}` : ''}` : '';

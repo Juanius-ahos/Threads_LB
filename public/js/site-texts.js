@@ -11,6 +11,8 @@ window.SITE_TEXTS = [
     ['nav.sale', 'Menu: sale', 'Sale'],
     ['nav.help', 'Phone menu: help line', 'Need help?'],
     ['nav.wa', 'Phone menu: WhatsApp link', 'WhatsApp us'],
+    ['wa.float', 'WhatsApp button (corner): label', 'Chat with us'],
+    ['wa.message', 'WhatsApp button (corner): first message', 'Hi THREADS! I have a question.'],
     ['search.placeholder', 'Search box', 'Search products'],
   ] },
   { group: 'Homepage', items: [

@@ -41,6 +41,7 @@
         <a href="/shop?sale=1" data-link class="nav-sale" data-t="nav.sale">Sale</a>
       </nav>
       <div class="top-actions">
+        <a class="icon-btn ig-btn" id="navIg" target="_blank" rel="noopener" aria-label="THREADS on Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor" stroke="none"/></svg></a>
         <button class="icon-btn" id="searchBtn" aria-label="Search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
         </button>
@@ -60,6 +61,10 @@
         <h2 data-t="foot.title">Not sure of your size?</h2>
         <p class="f-sub" data-t="foot.sub">Message us on WhatsApp, or come try it on at the store.</p>
         <div class="cta-row"><a class="btn btn-green" id="footWaBtn" target="_blank" rel="noopener" data-t="foot.wa">Message us on WhatsApp</a><a class="btn btn-ghost-d" id="footMapBtn" target="_blank" rel="noopener" data-t="foot.dir">Get directions</a></div>
+        <div class="f-social">
+          <a id="footIgIcon" target="_blank" rel="noopener" aria-label="THREADS on Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor" stroke="none"/></svg><span>@threadsactivewear</span></a>
+          <a id="footWaIcon" target="_blank" rel="noopener" aria-label="THREADS on WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9.2 8.6c.2 2.6 3.4 5.9 6 6.2l1-1.2-2-1-1 .8c-1-.4-2.3-1.7-2.8-2.8l.8-1-1-2z"/></svg><span id="footWaNum"></span></a>
+        </div>
       </div>
       <div class="f-cols">
         <nav class="f-col" aria-label="Shop">
@@ -119,7 +124,8 @@
     <a href="/shop?sale=1" data-link data-t="nav.sale">Sale</a>
     <div class="mmenu-cats" id="mmenuCats"></div>
     <div class="mmenu-brands" id="mmenuBrands"></div>
-    <div class="mmenu-foot"><span data-t="nav.help">Need help?</span> <a id="mmWa" target="_blank" rel="noopener" data-t="nav.wa">WhatsApp us</a></div>
+    <div class="mmenu-foot"><span data-t="nav.help">Need help?</span> <a id="mmWa" target="_blank" rel="noopener" data-t="nav.wa">WhatsApp us</a>
+      <a class="mmenu-ig" id="mmIg" target="_blank" rel="noopener" aria-label="THREADS on Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor" stroke="none"/></svg><span>Instagram</span></a></div>
   </aside>
 
   <!-- Search -->
@@ -180,6 +186,7 @@
     </div>
   </div>
 
+  <a class="wa-float" id="waFloat" target="_blank" rel="noopener" aria-label="Chat with THREADS on WhatsApp" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9.2 8.6c.2 2.6 3.4 5.9 6 6.2l1-1.2-2-1-1 .8c-1-.4-2.3-1.7-2.8-2.8l.8-1-1-2z"/></svg><span class="wa-float-label" data-t="wa.float">Chat with us</span></a>
   <div class="grain" aria-hidden="true"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>

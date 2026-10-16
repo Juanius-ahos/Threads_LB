@@ -137,7 +137,7 @@ const DEFAULT_SETTINGS = {
   currency: '$',
   delivery_fee: '4',
   free_delivery_over: '100',
-  whatsapp: '96100000000',
+  whatsapp: '96171043048',
   instagram: 'https://www.instagram.com/threadsactivewear/',
   announcement: 'Cash on delivery all over Lebanon · Free delivery on orders over $100',
   store_address: 'Ste. Takla Centre, Wadi Chahrour El Soufla, Main Road',
