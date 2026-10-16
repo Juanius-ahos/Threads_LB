@@ -8,7 +8,7 @@
     "api/index.js": { "maxDuration": 60, "memory": 1024 }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/api/:path*", "destination": "/api?_p=:path*" },
     { "source": "/admin", "destination": "/admin/index.html" },
     { "source": "/admin/:path*", "destination": "/admin/index.html" },
     { "source": "/:path*", "destination": "/index.html" }
