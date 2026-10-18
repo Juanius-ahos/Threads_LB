@@ -589,16 +589,17 @@
       </div>
       <div id="xresult"></div>`;
     const wireDrop = (zone, input, fn) => {
-      input.onchange = () => { fn(input.files); input.value = ''; };
+      input.onchange = () => { fn([...input.files]); input.value = ''; };
       ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('over'); }));
       ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, () => zone.classList.remove('over')));
       zone.addEventListener('drop', e => { e.preventDefault(); fn(e.dataTransfer.files); });
     };
     wireDrop($('#xdrop'), $('#xfile'), async files => {
-      if (!files[0]) return;
+      const file = files[0];   // keep it: the picker is emptied right after, which empties this list too
+      if (!file) return;
       $('#xresult').innerHTML = '<div class="card empty"><div class="spinner" style="margin:auto"></div><p>Reading your sheet…</p></div>';
-      const fd = new FormData(); fd.append('file', files[0]);
-      try { const { rows } = await api('/api/admin/import/preview', { method: 'POST', body: fd }); showPreview(rows, files[0].name); }
+      const fd = new FormData(); fd.append('file', file);
+      try { const { rows } = await api('/api/admin/import/preview', { method: 'POST', body: fd }); showPreview(rows, file.name); }
       catch (e) { $('#xresult').innerHTML = `<div class="card card-pad" style="color:var(--red)"><b>Couldn't import:</b> ${esc(e.message)}</div>`; }
     });
     wireDrop($('#bdrop'), $('#bfile'), async files => {
